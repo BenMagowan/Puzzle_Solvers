@@ -3,10 +3,10 @@ import time
 def display(grid):
     for i in range(9):
         if i % 3 == 0 and i != 0:
-            print('-'*6+'+'+'-'*7+'+'+'-'*6)
+            print('─'*6+'┼'+'─'*7+'┼'+'─'*6)
         for j in range(9):
             if j % 3 == 0 and j != 0:
-                print('|', end=' ')
+                print('│', end=' ')
             print(grid[i*9 + j], end=' ')
         print()
 
