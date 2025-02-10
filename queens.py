@@ -1,41 +1,74 @@
 import time
 
+# │ ┤ ┐ ┌ ┘ └ ┴ ┬ ├ ─ ┼
+
 def display(GRID, QUEENS):
     N = 8
-    CELL_WIDTH = 4  # adjust as needed for spacing
+    CELL_WIDTH = 3  # adjust as needed for spacing
 
     ROWS = [GRID[i * N:(i + 1) * N] for i in range(N)]
     QUEEN_POSITIONS = [QUEENS[i * N:(i + 1) * N] for i in range(N)]
 
     def get_corner(i, row, previous_row):
         if previous_row is None:
-            return "+" if i == 0 or row[i] != row[i - 1] else "-"
-        if previous_row[i - 1] == row[i - 1] and previous_row[i] == row[i] and row[i - 1] == row[i]:
+            if i == 0:
+                return "┌"
+            return "┬" if row[i] != row[i - 1] else "─"
+        
+        if i == 0:
+            return "│"
+
+        top_left, top_right = previous_row[i - 1], previous_row[i]
+        bottom_left, bottom_right = row[i - 1], row[i]
+
+        if top_left == bottom_left == top_right == bottom_right:
             return " "
-        if i == 0 or previous_row[i - 1] == row[i - 1] and previous_row[i] == row[i]:
-            return "|"
-        if previous_row[i] == previous_row[i - 1] and row[i] == row[i - 1]:
-            return "-"
-        return "+"
+        if top_left == top_right == bottom_left:
+            return "┌"
+        if top_left == top_right == bottom_right:
+            return "┐"
+        if bottom_left == bottom_right == top_left:
+            return "└"
+        if bottom_left == bottom_right == top_right:
+            return "┘"
+        if top_left == bottom_left and top_right != bottom_right:
+            return "├"
+        if top_right == bottom_right and top_left != bottom_left:
+            return "┤"
+        if bottom_left == bottom_right and top_left != top_right:
+            return "┴"
+        if top_left == top_right and bottom_left != bottom_right:
+            return "┬"
+        if top_left == bottom_left and top_right == bottom_right:
+            return "│"
+        if top_left == top_right and bottom_left == bottom_right:
+            return "─"
+        return "┼"
+
 
     def print_border(row, previous_row):
         border = ""
         for i in range(N):
             corner = get_corner(i, row, previous_row)
             if previous_row is None or previous_row[i] != row[i]:
-                border += corner + "-" * CELL_WIDTH
+                border += corner + "─" * CELL_WIDTH
             else:
                 border += corner + " " * CELL_WIDTH
-        border += "+" if previous_row is None or row[-1] != previous_row[-1] else "|"
+        if previous_row is None:
+            border += "┐"
+        elif row[-1] != previous_row[-1]:
+            border += "┤"
+        else:
+            border += "│"
         print(border)
 
     def print_content(row, queen_row):
-        line = "|"
+        line = "│"
         for i, cell in enumerate(row):
-            line += " Q " + " " if queen_row[i] == 'Q' else " " * CELL_WIDTH
+            line += "Q".center(CELL_WIDTH) if queen_row[i] == 'Q' else " " * CELL_WIDTH
             if i < N - 1:
-                line += "|" if row[i] != row[i + 1] else " "
-        line += "|"
+                line += "│" if row[i] != row[i + 1] else " "
+        line += "│"
         print(line)
 
     def print_grid(rows, queen_positions):
@@ -47,13 +80,13 @@ def display(GRID, QUEENS):
         print_final_border(rows[-1])
 
     def print_final_border(last_row):
-        line = "+" + "-" * CELL_WIDTH
+        line = "└" + "─" * CELL_WIDTH
         for i in range(1, N):
             if last_row[i - 1] == last_row[i]:
-                line += "-" * (CELL_WIDTH + 1)
+                line += "─" * (CELL_WIDTH + 1)
             else:
-                line += "+" + "-" * CELL_WIDTH
-        print(line + "+")
+                line += "┴" + "─" * CELL_WIDTH
+        print(line + "┘")
 
     print_grid(ROWS, QUEEN_POSITIONS)
 
