@@ -24,7 +24,6 @@ const games = 'https://www.linkedin.com/games/';
 
 // When the user clicks on the extension action
 chrome.action.onClicked.addListener(async (tab) => {
-    console.log(tab.url);
     if (tab.url.startsWith(games)) {
         // We retrieve the action badge to check if the extension is 'ON' or 'OFF'
         const prevState = await chrome.action.getBadgeText({ tabId: tab.id });
@@ -38,82 +37,88 @@ chrome.action.onClicked.addListener(async (tab) => {
         });
 
         if (nextState === 'ON') {
-            console.log('ON');
-        } else if (nextState === 'OFF') {
-            console.log('OFF');
-        }
+            console.log('Showing solution');
+            // Get the grid
+            const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: () => {
+                    const queensGrid = document.getElementById("queens-grid");
+                    if (!queensGrid) return null;
+                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
 
-        // Get the grid
-        const results = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            function: () => {
-                const queensGrid = document.getElementById("queens-grid");
-                if (!queensGrid) return null;
-                const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+                    let colorString = "";
+                    cells.forEach(cell => {
+                        const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
+                        if (colorClass) {
+                            const colorNumber = colorClass.split("cell-color-")[1].trim();
+                            colorString += colorNumber;
+                        }
+                    });
+                    return colorString;
 
-                let colorString = "";
-                cells.forEach(cell => {
-                    const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
-                    if (colorClass) {
-                        const colorNumber = colorClass.split("cell-color-")[1].trim();
-                        colorString += colorNumber;
-                    }
-                });
-                return colorString;
+                }
+            });
 
-            }
-        });
+            const colorString = results[0].result;
+            if (colorString) {
+                // Prepare GRID and QUEENS using the color string and default queen string
+                let GRIDFromPage = colorString.split('');
+                let QUEENSFromPage = new Array(GRIDFromPage.length).fill('.');
+                if (solve(GRIDFromPage, QUEENSFromPage)) {
+                    console.log("Puzzle solved!");
+                    // Display overlay
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        args: [QUEENSFromPage],
+                        function: (queens) => {
+                            const queensGrid = document.getElementById("queens-grid");
+                            if (!queensGrid) return null;
+                            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
 
-        const colorString = results[0].result;
-        if (colorString) {
-            console.log(colorString);
-        } else {
-            console.error("Element #queens-grid not found or has no div elements.");
-        }
+                            // Remove any existing overlays first
+                            document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
 
-        // Solve the puzzle
-        if (colorString) {
-            // Prepare GRID and QUEENS using the color string and default queen string
-            let GRIDFromPage = colorString.split('');
-            var QUEENSFromPage = '................................................................'.split('');
-            if (solve(GRIDFromPage, QUEENSFromPage)) {
-                console.log("Puzzle solved!");
-                display(GRIDFromPage, QUEENSFromPage);
+                            cells.forEach((cell, index) => {
+                                if (queens[index] === 'Q') {
+                                    // Create overlay for queen positions
+                                    const overlay = document.createElement('div');
+                                    overlay.classList.add('queen-overlay');
+                                    Object.assign(overlay.style, {
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        backgroundColor: 'rgba(255, 0, 0, 0.75)',
+                                        zIndex: 100
+                                    });
+
+                                    cell.style.position = 'relative';
+                                    cell.appendChild(overlay);
+                                }
+                            });
+                        }
+                    })
+                } else {
+                    console.log("No solution found for puzzle.");
+                }
             } else {
-                console.log("No solution found for puzzle.");
+                console.log("Element #queens-grid not found or has no div elements.");
             }
-            console.log("GRID: " + GRIDFromPage);
-            console.log("QUEENS: " + QUEENSFromPage);
+        } else if (nextState === 'OFF') {
+            console.log('Hiding solution');
+            // Remove overlay
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: () => {
+                    const queensGrid = document.getElementById("queens-grid");
+                    if (!queensGrid) return null;
+                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+
+                    // Remove any existing overlays first
+                    document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
+                }
+            })
         }
-
-        // Display overlay
-        await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            args: [QUEENSFromPage],
-            function: (queens) => {
-                const queensGrid = document.getElementById("queens-grid");
-                if (!queensGrid) return null;
-                const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
-
-                cells.forEach((cell, index) => {
-                    if (queens[index] === 'Q') {
-                        // Create overlay for queen positions
-                        const overlay = document.createElement('div');
-                        Object.assign(overlay.style, {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            backgroundColor: 'rgba(255, 0, 0, 0.75)',
-                            zIndex: 100
-                        });
-
-                        cell.style.position = 'relative';
-                        cell.appendChild(overlay);
-                    }
-                });
-            }
-        })
     }
 });
