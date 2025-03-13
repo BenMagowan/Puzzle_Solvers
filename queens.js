@@ -1,5 +1,5 @@
 function display(GRID, QUEENS) {
-    const N = 8;
+    const N = Math.sqrt(GRID.length);
     const CELL_WIDTH = 3; // adjust as needed for spacing
 
     // ...existing code: create rows arrays...
@@ -106,7 +106,7 @@ function findEmptyColour(GRID, QUEENS) {
 }
 
 function isValid(GRID, QUEENS, i, colour) {
-    const N = 8;
+    const N = Math.sqrt(GRID.length);
     if (GRID[i] !== colour) return false;
 
     for (let j = 0; j < GRID.length; j++) {

@@ -64,6 +64,9 @@ chrome.action.onClicked.addListener(async (tab) => {
                 // Prepare GRID and QUEENS using the color string and default queen string
                 let GRIDFromPage = colorString.split('');
                 let QUEENSFromPage = new Array(GRIDFromPage.length).fill('.');
+                console.log("GRIDFromPage: ", GRIDFromPage);
+                console.log("QUEENSFromPage: ", QUEENSFromPage);
+                display(GRIDFromPage, QUEENSFromPage);
                 if (solve(GRIDFromPage, QUEENSFromPage)) {
                     console.log("Puzzle solved!");
                     // Display overlay
