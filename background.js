@@ -44,7 +44,7 @@ async function getQueensGridData(tabId) {
     return results[0].result;
 }
 
-async function displaySolution(tabId, queens) {
+async function displayOverlay(tabId, queens) {
     await chrome.scripting.executeScript({
         target: { tabId: tabId },
         args: [queens],
@@ -57,29 +57,42 @@ async function displaySolution(tabId, queens) {
             document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
 
             cells.forEach((cell, index) => {
-                if (queens[index] === 'Q') {
-                    // Create overlay for queen positions
-                    const overlay = document.createElement('div');
-                    overlay.classList.add('queen-overlay');
-                    Object.assign(overlay.style, {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        backgroundColor: 'rgba(255, 0, 0, 0.75)',
-                        zIndex: 100
-                    });
+                const overlay = document.createElement('div');
+                overlay.classList.add('queen-overlay');
+                Object.assign(overlay.style, {
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    backgroundColor: 'rgba(0, 0, 0, 0)',
+                    zIndex: 100
+                });
 
-                    cell.style.position = 'relative';
-                    cell.appendChild(overlay);
+                // Check if aria-label begins with 'Queen'
+                if (cell.getAttribute('aria-label').startsWith('Queen')) {
+                    if (queens[index] === 'Q') {
+                        // Change background colour to green
+                        overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.75)';
+                    } else {
+                        // Change background colour to red
+                        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.75)';
+                    }
+                } else {
+                    if (queens[index] === 'Q') {
+                        // Change background colour to red
+                        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.75)';
+                    }
                 }
+
+                cell.style.position = 'relative';
+                cell.appendChild(overlay);
             });
         }
     });
 }
 
-async function removeSolution(tabId) {
+async function removeOverlay(tabId) {
     await chrome.scripting.executeScript({
         target: { tabId: tabId },
         function: () => {
@@ -121,7 +134,7 @@ async function toggleSolution(tab) {
                 if (solve(GRIDFromPage, QUEENSFromPage)) {
                     console.log("Puzzle solved!");
                     // Display overlay
-                    await displaySolution(tab.id, QUEENSFromPage);
+                    await displayOverlay(tab.id, QUEENSFromPage);
                 } else {
                     console.log("No solution found for puzzle.");
                 }
@@ -131,7 +144,7 @@ async function toggleSolution(tab) {
         } else if (nextState === 'OFF') {
             console.log('Hiding solution');
             // Remove overlay
-            await removeSolution(tab.id);
+            await removeOverlay(tab.id);
         }
     }
 }
