@@ -22,8 +22,78 @@ chrome.runtime.onInstalled.addListener(() => {
 
 const games = 'https://www.linkedin.com/games/';
 
-// When the user clicks on the extension action
-chrome.action.onClicked.addListener(async (tab) => {
+async function getQueensGridData(tabId) {
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        function: () => {
+            const queensGrid = document.getElementById("queens-grid");
+            if (!queensGrid) return null;
+            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+
+            let colorString = "";
+            cells.forEach(cell => {
+                const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
+                if (colorClass) {
+                    const colorNumber = colorClass.split("cell-color-")[1].trim();
+                    colorString += colorNumber;
+                }
+            });
+            return colorString;
+        }
+    });
+    return results[0].result;
+}
+
+async function displaySolution(tabId, queens) {
+    await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        args: [queens],
+        function: (queens) => {
+            const queensGrid = document.getElementById("queens-grid");
+            if (!queensGrid) return null;
+            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+
+            // Remove any existing overlays first
+            document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
+
+            cells.forEach((cell, index) => {
+                if (queens[index] === 'Q') {
+                    // Create overlay for queen positions
+                    const overlay = document.createElement('div');
+                    overlay.classList.add('queen-overlay');
+                    Object.assign(overlay.style, {
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        backgroundColor: 'rgba(255, 0, 0, 0.75)',
+                        zIndex: 100
+                    });
+
+                    cell.style.position = 'relative';
+                    cell.appendChild(overlay);
+                }
+            });
+        }
+    });
+}
+
+async function removeSolution(tabId) {
+    await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        function: () => {
+            const queensGrid = document.getElementById("queens-grid");
+            if (!queensGrid) return null;
+            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+
+            // Remove any existing overlays first
+            document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
+        }
+    });
+}
+
+async function toggleSolution(tab) {
     if (tab.url.startsWith(games)) {
         // We retrieve the action badge to check if the extension is 'ON' or 'OFF'
         const prevState = await chrome.action.getBadgeText({ tabId: tab.id });
@@ -39,27 +109,8 @@ chrome.action.onClicked.addListener(async (tab) => {
         if (nextState === 'ON') {
             console.log('Showing solution');
             // Get the grid
-            const results = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: () => {
-                    const queensGrid = document.getElementById("queens-grid");
-                    if (!queensGrid) return null;
-                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+            const colorString = await getQueensGridData(tab.id);
 
-                    let colorString = "";
-                    cells.forEach(cell => {
-                        const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
-                        if (colorClass) {
-                            const colorNumber = colorClass.split("cell-color-")[1].trim();
-                            colorString += colorNumber;
-                        }
-                    });
-                    return colorString;
-
-                }
-            });
-
-            const colorString = results[0].result;
             if (colorString) {
                 // Prepare GRID and QUEENS using the color string and default queen string
                 let GRIDFromPage = colorString.split('');
@@ -70,38 +121,7 @@ chrome.action.onClicked.addListener(async (tab) => {
                 if (solve(GRIDFromPage, QUEENSFromPage)) {
                     console.log("Puzzle solved!");
                     // Display overlay
-                    await chrome.scripting.executeScript({
-                        target: { tabId: tab.id },
-                        args: [QUEENSFromPage],
-                        function: (queens) => {
-                            const queensGrid = document.getElementById("queens-grid");
-                            if (!queensGrid) return null;
-                            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
-
-                            // Remove any existing overlays first
-                            document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
-
-                            cells.forEach((cell, index) => {
-                                if (queens[index] === 'Q') {
-                                    // Create overlay for queen positions
-                                    const overlay = document.createElement('div');
-                                    overlay.classList.add('queen-overlay');
-                                    Object.assign(overlay.style, {
-                                        position: 'absolute',
-                                        top: 0,
-                                        left: 0,
-                                        width: '100%',
-                                        height: '100%',
-                                        backgroundColor: 'rgba(255, 0, 0, 0.75)',
-                                        zIndex: 100
-                                    });
-
-                                    cell.style.position = 'relative';
-                                    cell.appendChild(overlay);
-                                }
-                            });
-                        }
-                    })
+                    await displaySolution(tab.id, QUEENSFromPage);
                 } else {
                     console.log("No solution found for puzzle.");
                 }
@@ -111,17 +131,10 @@ chrome.action.onClicked.addListener(async (tab) => {
         } else if (nextState === 'OFF') {
             console.log('Hiding solution');
             // Remove overlay
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                function: () => {
-                    const queensGrid = document.getElementById("queens-grid");
-                    if (!queensGrid) return null;
-                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
-
-                    // Remove any existing overlays first
-                    document.querySelectorAll('.queen-overlay').forEach(overlay => overlay.remove());
-                }
-            })
+            await removeSolution(tab.id);
         }
     }
-});
+}
+
+// When the user clicks on the extension action
+chrome.action.onClicked.addListener(toggleSolution);
