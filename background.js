@@ -1,17 +1,3 @@
-// Copyright 2022 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 import * as queensSolver from './puzzles/queensSolver.js';
 import * as zipSolver from './puzzles/zipSolver.js';
 
@@ -36,7 +22,7 @@ async function toggleSolution(tab) {
     if (nextState === 'ON') {
         await initialiseExtension(tab);
     } else if (nextState === 'OFF') {
-        await cleanupExtension(tab);
+        await removeOverlay(tab.id);
     }
 }
 
@@ -44,127 +30,111 @@ async function initialiseExtension(tab) {
     const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].slice(0, -1);
     console.log('Solving...', puzzleType);
 
+    const gridData = await getGridData(tab.id, puzzleType);
+    if (!gridData) {
+        console.log('No grid found');
+        return;
+    }
+
+    const solution = findSolution(gridData, puzzleType);
+    if (!solution) {
+        console.log('No solution found');
+        return;
+    }
+
+    await displayOverlay(tab.id, solution, puzzleType);
+}
+
+async function getGridData(tabId, puzzleType) {
     switch (puzzleType) {
         case 'queens':
-            // Get queens grid data
-            const queensGridData = await getQueensGridData(tab.id);
-            if (!queensGridData) {
-                console.log('No queens grid found');
-                return;
-            }
+            const results = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: () => {
+                    const queensGrid = document.getElementById("queens-grid");
+                    if (!queensGrid) return null;
 
-            // Solve the queens problem
-            const solution = calculateSolution(queensGridData);
-            if (!solution) {
-                console.log('No solution found');
-                return;
-            }
+                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
 
-            // Display the overlay
-            await updateQueensOverlay(tab.id, solution);
-            return;
+                    let colorString = "";
+                    cells.forEach(cell => {
+                        const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
+                        if (colorClass) {
+                            const colorNumber = colorClass.split("cell-color-")[1].trim();
+                            colorString += colorNumber;
+                        }
+                    });
+                    return colorString;
+                }
+            });
+            return results[0].result;
         case 'zip':
-            // Get zip grid data
-            // const zipGridData = await getZipGridData(tab.id);
-            // if (!zipGridData) {
-            //     console.log('No zip grid found');
-            //     return;
-            // }
-
-            // Solve the zip problem
-            // const solution = calculateZipSolution(zipGridData);
-            // if (!solution) {
-            //     console.log('No solution found');
-            //     return;
-            // }
-
-            const zipSolution = [
-                3, 2, 33, 32, 25, 24,
-                4, 1, 34, 31, 26, 23,
-                5, 36, 35, 30, 27, 22,
-                6, 11, 12, 29, 28, 21,
-                7, 10, 13, 16, 17, 20,
-                8, 9, 14, 15, 18, 19
+            const zipGrid = [
+                0, 0, 0, 0, 0, 0,
+                0, 1, 0, 0, 0, 0,
+                0, 4, 0, 0, 0, 0,
+                0, 0, 0, 0, 3, 0,
+                0, 0, 0, 0, 2, 0,
+                0, 0, 0, 0, 0, 0
             ]
 
-            // Display the overlay
-            await updateZipGameOverlay(tab.id, zipSolution);
-            return;
-        case 'tango':
-            console.log('Tango puzzle not supported yet');
-            return;
-        case 'pinpoint':
-            console.log('Pinpoint puzzle not supported yet');
-            return;
-        case 'crossclimb':
-            console.log('Crossclimb puzzle not supported yet');
-            return;
+            const walls = [
+                [6, 7],
+                [12, 13],
+                [18, 19],
+                [24, 25],
+                [10, 11],
+                [16, 17],
+                [22, 23],
+                [28, 29]
+            ];
+
+            return [zipGrid, walls];
         default:
             console.log('Unknown puzzle type');
-            return;
+            return null;
     }
 }
 
-async function cleanupExtension(tab) {
-    console.log('Cleaning up extension');
-    await removeOverlay(tab.id);
+function findSolution(gridData, puzzleType) {
+    switch (puzzleType) {
+        case 'queens':
+            const queensGrid = gridData.split('');
+            const queens = new Array(queensGrid.length).fill('.');
+
+            if (!queensSolver.solve(queensGrid, queens)) return null;
+
+            queensSolver.display(queensGrid, queens);
+
+            return queens;
+        case 'zip':
+            const zipGrid = gridData[0];
+            const walls = gridData[1];
+
+            const path = zipGrid.map(value => value === 1 ? 1 : 0);
+
+            if (!zipSolver.solve(zipGrid, path, walls)) return null;
+
+            zipSolver.display(path, walls);
+
+            return path;
+        default:
+            console.log('Unknown puzzle type');
+            return null;
+    }
 }
 
-async function getQueensGridData(tabId) {
-    const results = await chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        function: () => {
-            const queensGrid = document.getElementById("queens-grid");
-            if (!queensGrid) return null;
-
-            const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
-
-            let colorString = "";
-            cells.forEach(cell => {
-                const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
-                if (colorClass) {
-                    const colorNumber = colorClass.split("cell-color-")[1].trim();
-                    colorString += colorNumber;
-                }
-            });
-            return colorString;
-        }
-    });
-    return results[0].result;
-}
-
-function calculateSolution(queensGridData) {
-    const grid = queensGridData.split('');
-    const queens = new Array(grid.length).fill('.');
-
-
-
-    if (!queensSolver.solve(grid, queens)) return null;
-
-    queensSolver.display(grid, queens);
-
-    return queens;
-}
-
-async function updateQueensOverlay(tabId, solution) {
+async function displayOverlay(tabId, solution, puzzleType) {
     await chrome.scripting.executeScript({
         target: { tabId },
-        args: [solution],
-        function: (solution) => {
+        args: [solution, puzzleType],
+        function: (solution, puzzleType) => {
             // Cleanup previous state
-            const cleanup = () => {
-                document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
-                if (window.queenObserver) {
-                    window.queenObserver.disconnect();
-                    delete window.queenObserver;
-                }
-            };
-
-            cleanup();
-
-            // Get current grid state
-            const grid = document.getElementById("queens-grid");
-            if (!grid) return;
+            document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
+            if (window.gridObserver) {
+                window.gridObserver.disconnect();
+                delete window.gridObserver;
+            }
 
             // Create mutation observer
             const observer = new MutationObserver(() => {
@@ -175,6 +145,19 @@ async function updateQueensOverlay(tabId, solution) {
                 }, 100);
             });
 
+            var grid = null;
+            // Get current grid state
+            switch (puzzleType) {
+                case 'queens':
+                    var grid = document.getElementById("queens-grid");
+                    break;
+                case 'zip':
+                    var grid = document.querySelector(".trail-grid");
+                    break;
+            }
+
+            if (!grid) return;
+
             // Start observing grid changes
             observer.observe(grid, {
                 subtree: true,
@@ -182,17 +165,24 @@ async function updateQueensOverlay(tabId, solution) {
                 attributeFilter: ['class', 'aria-label']
             });
 
-            window.queenObserver = observer;
+            window.gridObserver = observer;
 
             // Create visual overlays
-            grid.querySelectorAll(".queens-cell-with-border").forEach((cell, index) => {
-                const overlay = createOverlayElement(cell, solution[index]);
-                cell.appendChild(overlay);
-            });
+            switch (puzzleType) {
+                case 'queens':
+                    grid.querySelectorAll(".queens-cell-with-border").forEach((cell, index) => {
+                        const overlay = createOverlayElement(cell, solution[index]);
+                        cell.appendChild(overlay);
+                    });
+                    break;
+                case 'zip':
+                    grid.querySelectorAll(".trail-cell").forEach((cell, index) => {
+                        const overlay = createOverlayElement(cell, solution[index]);
+                        cell.appendChild(overlay);
+                    });
+                    break;
+            }
 
-            /**
-             * Creates a single overlay element
-             */
             function createOverlayElement(cell, solutionState) {
                 const overlay = document.createElement('div');
                 overlay.className = 'cell-overlay';
@@ -209,63 +199,25 @@ async function updateQueensOverlay(tabId, solution) {
                 });
 
                 // Color logic
-                const isQueenCell = cell.getAttribute('aria-label').startsWith('Queen');
-                const isCorrectPosition = solutionState === 'Q';
+                switch (puzzleType) {
+                    case 'queens':
+                        const isQueenCell = cell.getAttribute('aria-label').startsWith('Queen');
+                        const isCorrectPosition = solutionState === 'Q';
 
-                if (isQueenCell) {
-                    overlay.style.backgroundColor = isCorrectPosition
-                        ? 'rgba(0, 0, 0, 0)'  // Correct position - transparent
-                        : 'rgba(255, 0, 0, 0.75)'; // Incorrect position - red
-                } else if (isCorrectPosition) {
-                    overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.75)'; // Suggested position - green
+                        if (isQueenCell) {
+                            overlay.style.backgroundColor = isCorrectPosition
+                                ? 'rgba(0, 0, 0, 0)'        // Correct position - transparent
+                                : 'rgba(255, 0, 0, 0.75)';  // Incorrect position - red
+                        } else if (isCorrectPosition) {
+                            overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.75)'; // Suggested position - green
+                        }
+                        break;
+                    case 'zip':
+                        const greenValue = 255 - (255 / 36) * solutionState;
+                        const redValue = Math.min(255, Math.max(0, (255 / 36) * solutionState * 2));
+                        overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, 0, 0.75)`; // Suggested position - green
+                        break;
                 }
-
-                return overlay;
-            }
-        }
-    });
-}
-
-async function updateZipGameOverlay(tabId, solution) {
-    await chrome.scripting.executeScript({
-        target: { tabId },
-        args: [solution],
-        function: (solution) => {
-            // Cleanup previous state
-            document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
-
-            // Get current grid state class name contains "trail-grid"
-            const grid = document.querySelector(".trail-grid");
-            console.log(grid);
-            if (!grid) return;
-
-            // Create visual overlays
-            grid.querySelectorAll(".trail-cell").forEach((cell, index) => {
-                const overlay = createOverlayElement(cell, solution[index]);
-                cell.appendChild(overlay);
-            });
-
-            /**
-             * Creates a single overlay element
-             */
-            function createOverlayElement(cell, solutionState) {
-                const overlay = document.createElement('div');
-                overlay.className = 'cell-overlay';
-
-                // Position styling
-                Object.assign(overlay.style, {
-                    position: 'absolute',
-                    top: '0',
-                    left: '0',
-                    width: '100%',
-                    height: '100%',
-                    zIndex: '1000',
-                    pointerEvents: 'none'
-                });
-
-                const greenValue = 255 - (255 / 36) * solutionState;
-                const redValue = Math.min(255, Math.max(0, (255 / 36) * solutionState * 2));
-                overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, 0, 0.75)`; // Suggested position - green
 
                 return overlay;
             }

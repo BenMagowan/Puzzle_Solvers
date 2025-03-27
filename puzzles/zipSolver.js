@@ -59,21 +59,21 @@ function display(grid, walls) {
     displayBorder(false);
 }
 
-function solve(grid, path) {
-    function findEmptyCells(path, N) {
+function solve(grid, path, walls) {
+    function findEmptyCells(path, walls, N) {
         const end = path.indexOf(Math.max(...path));
         const emptyCells = [];
 
-        if (end - N >= 0 && path[end - N] === 0 && !walls.some(w => JSON.stringify(w.sort()) === JSON.stringify([end, end - N].sort()))) {
+        if (end - N >= 0 && path[end - N] === 0 && !walls.some(coord => coord[0] === end && coord[1] === end - N)) {
             emptyCells.push(end - N);
         }
-        if (end + N < N * N && path[end + N] === 0 && !walls.some(w => JSON.stringify(w.sort()) === JSON.stringify([end, end + N].sort()))) {
+        if (end + N < N * N && path[end + N] === 0 && !walls.some(coord => coord[0] === end && coord[1] === end + N)) {
             emptyCells.push(end + N);
         }
-        if (end % N > 0 && path[end - 1] === 0 && !walls.some(w => JSON.stringify(w.sort()) === JSON.stringify([end, end - 1].sort()))) {
+        if (end % N > 0 && path[end - 1] === 0 && !walls.some(coord => coord[0] === end && coord[1] === end - 1)) {
             emptyCells.push(end - 1);
         }
-        if (end % N < N - 1 && path[end + 1] === 0 && !walls.some(w => JSON.stringify(w.sort()) === JSON.stringify([end, end + 1].sort()))) {
+        if (end % N < N - 1 && path[end + 1] === 0 && !walls.some(coord => coord[0] === end && coord[1] === end + 1)) {
             emptyCells.push(end + 1);
         }
 
@@ -105,7 +105,7 @@ function solve(grid, path) {
         return true;
     }
 
-    const emptyCells = findEmptyCells(path, N);
+    const emptyCells = findEmptyCells(path, walls, N);
 
     if (emptyCells.length === 0) {
         return false;
@@ -115,7 +115,8 @@ function solve(grid, path) {
         if (isValid(grid, path)) {
             path[emptyCell] = nextNum;
 
-            if (solve(grid, path)) {
+            // Changed recursive call to pass walls parameter
+            if (solve(grid, path, walls)) {
                 return true;
             }
 
