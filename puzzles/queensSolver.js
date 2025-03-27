@@ -1,13 +1,13 @@
-function display(GRID, QUEENS) {
-    const N = Math.sqrt(GRID.length);
+function display(grid, queens) {
+    const N = Math.sqrt(grid.length);
     const CELL_WIDTH = 3; // adjust as needed for spacing
 
     // ...existing code: create rows arrays...
     const rows = [];
     const queenPositions = [];
     for (let i = 0; i < N; i++) {
-        rows.push(GRID.slice(i * N, (i + 1) * N));
-        queenPositions.push(QUEENS.slice(i * N, (i + 1) * N));
+        rows.push(grid.slice(i * N, (i + 1) * N));
+        queenPositions.push(queens.slice(i * N, (i + 1) * N));
     }
 
     function getCorner(i, row, previousRow) {
@@ -89,77 +89,63 @@ function display(GRID, QUEENS) {
     printGrid(rows, queenPositions);
 }
 
-function findEmptyColour(GRID, QUEENS) {
-    const colours = Array.from(new Set(GRID));
-    colours.sort((a, b) => GRID.filter(c => c === a).length - GRID.filter(c => c === b).length);
-    for (let colour of colours) {
-        let found = true;
-        for (let i = 0; i < GRID.length; i++) {
-            if (GRID[i] === colour && QUEENS[i] === 'Q') {
-                found = false;
-                break;
+function solve(grid, queens) {
+    function findEmptyColour(grid, queens) {
+        const colours = Array.from(new Set(grid));
+        colours.sort((a, b) => grid.filter(c => c === a).length - grid.filter(c => c === b).length);
+        for (let colour of colours) {
+            let found = true;
+            for (let i = 0; i < grid.length; i++) {
+                if (grid[i] === colour && queens[i] === 'Q') {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) return colour;
+        }
+        return null;
+    }
+
+    function isValid(grid, queens, i, colour) {
+        const N = Math.sqrt(grid.length);
+        if (grid[i] !== colour) return false;
+
+        for (let j = 0; j < grid.length; j++) {
+            if (queens[j] === 'Q' && grid[j] === grid[i]) return false;
+        }
+
+        // Check row
+        const rowStart = i - (i % N);
+        if (queens.slice(rowStart, rowStart + N).includes('Q')) return false;
+
+        // Check column
+        for (let j = i % N; j < grid.length; j += N) {
+            if (queens[j] === 'Q') return false;
+        }
+
+        // Check 3x3 neighbourhood
+        const row = Math.floor(i / N), col = i % N;
+        for (let r = row - 1; r <= row + 1; r++) {
+            for (let c = col - 1; c <= col + 1; c++) {
+                if (r >= 0 && r < N && c >= 0 && c < N && queens[r * N + c] === 'Q') {
+                    return false;
+                }
             }
         }
-        if (found) return colour;
-    }
-    return null;
-}
-
-function isValid(GRID, QUEENS, i, colour) {
-    const N = Math.sqrt(GRID.length);
-    if (GRID[i] !== colour) return false;
-
-    for (let j = 0; j < GRID.length; j++) {
-        if (QUEENS[j] === 'Q' && GRID[j] === GRID[i]) return false;
+        return true;
     }
 
-    // Check row
-    const rowStart = i - (i % N);
-    if (QUEENS.slice(rowStart, rowStart + N).includes('Q')) return false;
-
-    // Check column
-    for (let j = i % N; j < GRID.length; j += N) {
-        if (QUEENS[j] === 'Q') return false;
-    }
-
-    // Check 3x3 neighbourhood
-    const row = Math.floor(i / N), col = i % N;
-    for (let r = row - 1; r <= row + 1; r++) {
-        for (let c = col - 1; c <= col + 1; c++) {
-            if (r >= 0 && r < N && c >= 0 && c < N && QUEENS[r * N + c] === 'Q') {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-function solve(GRID, QUEENS) {
-    const colour = findEmptyColour(GRID, QUEENS);
+    const colour = findEmptyColour(grid, queens);
     if (colour === null) return true;
 
-    for (let i = 0; i < GRID.length; i++) {
-        if (isValid(GRID, QUEENS, i, colour)) {
-            QUEENS[i] = 'Q';
-            if (solve(GRID, QUEENS)) return true;
-            QUEENS[i] = '.'; // backtrack
+    for (let i = 0; i < grid.length; i++) {
+        if (isValid(grid, queens, i, colour)) {
+            queens[i] = 'Q';
+            if (solve(grid, queens)) return true;
+            queens[i] = '.'; // backtrack
         }
     }
     return false;
-}
-
-// ...existing code: initialize GRID and QUEENS...
-let GRID = '1111222213334242113444441134545413335456177758561717555611177666'.split('');
-let QUEENS = '................................................................'.split('');
-
-// Main execution
-display(GRID, QUEENS);
-let startTime = Date.now();
-if (solve(GRID, QUEENS)) {
-    console.log("Solution found in " + ((Date.now() - startTime) / 1000).toFixed(2) + " seconds");
-    display(GRID, QUEENS);
-} else {
-    console.log("No solution found");
 }
 
 export { solve, display };
