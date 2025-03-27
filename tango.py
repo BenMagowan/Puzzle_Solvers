@@ -77,7 +77,17 @@ def is_valid(grid, same_type, opposite_type):
     for a, b in opposite_type:
         if grid[a] != 0 and grid[b] != 0 and grid[a] == grid[b]:
             return False
-    
+        
+    # Check if more then 3 suns or moons total are in a row
+    for i in range(N):
+        if grid[i*N:i*N+N].count(1) > 3 or grid[i*N:i*N+N].count(2) > 3:
+            return False
+        
+    # Check if more then 3 suns or moons total are in a column
+    for i in range(N):
+        if [grid[j*N + i] for j in range(N)].count(1) > 3 or [grid[j*N + i] for j in range(N)].count(2) > 3:
+            return False
+        
     return True
 
 def solve(grid, same_type, opposite_type):

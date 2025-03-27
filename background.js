@@ -1,5 +1,6 @@
 import * as queensSolver from './puzzles/queensSolver.js';
 import * as zipSolver from './puzzles/zipSolver.js';
+import * as tangoSolver from './puzzles/tangoSolver.js';
 
 const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
@@ -81,7 +82,55 @@ async function getGridData(tabId, puzzleType) {
             const walls = [
             ];
 
-            return [zipGrid, walls];
+            const path = zipGrid.map(value => value === 1 ? 1 : 0);
+
+            return [zipGrid, walls, path];
+        case 'tango':
+            const tangoResults = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: () => {
+                    const tangoGridElement = document.querySelector(".lotka-grid");
+                    if (!tangoGridElement) return null;
+
+                    const cells = tangoGridElement.querySelectorAll(".lotka-cell");
+
+                    var tangoGrid = [];
+                    var sameType = [];
+                    var oppositeType = [];
+
+                    cells.forEach((cell, index) => {
+                        const svgElements = cell.querySelectorAll('svg');
+                        const cellContent = Array.from(svgElements).map(svgElement => svgElement.getAttribute('aria-label'));
+                        // check if the cell class contains lotka-cell--locked
+                        if (cell.classList.contains('lotka-cell--locked')) {
+                            if (cellContent.includes('Sun')) {
+                                tangoGrid.push(1);
+                            } else if (cellContent.includes('Moon')) {
+                                tangoGrid.push(2);
+                            }
+                        } else {
+                            tangoGrid.push(0);
+                        }
+
+                        if (cellContent.includes('Equal')) {
+                            sameType.push([index, index + 1]);
+                        } else if (cellContent.includes('Cross')) {
+                            oppositeType.push([index, index + 1]);
+                        }
+
+                    });
+
+                    return [tangoGrid, sameType, oppositeType];
+                }
+            });
+            const tangoGrid = tangoResults[0].result[0];
+            var sameType = tangoResults[0].result[1];
+            var oppositeType = tangoResults[0].result[2];
+
+            sameType = sameType.concat(sameType.map(([a, b]) => [b, a]));
+            oppositeType = oppositeType.concat(oppositeType.map(([a, b]) => [b, a]));
+
+            return [tangoGrid, sameType, oppositeType];
         default:
             console.log('Unknown puzzle type');
             return null;
@@ -102,14 +151,23 @@ function findSolution(gridData, puzzleType) {
         case 'zip':
             const zipGrid = gridData[0];
             const walls = gridData[1];
-
-            const path = zipGrid.map(value => value === 1 ? 1 : 0);
+            const path = gridData[2];
 
             if (!zipSolver.solve(zipGrid, path, walls)) return null;
 
             zipSolver.display(path, walls);
 
             return path;
+        case 'tango':
+            const tangoGrid = gridData[0];
+            const sameType = gridData[1];
+            const oppositeType = gridData[2];
+
+            if (!tangoSolver.solve(tangoGrid, sameType, oppositeType)) return null;
+
+            tangoSolver.display(tangoGrid, sameType, oppositeType);
+
+            return tangoGrid;
         default:
             console.log('Unknown puzzle type');
             return null;
@@ -143,6 +201,9 @@ async function displayOverlay(tabId, solution, puzzleType) {
                 case 'zip':
                     var grid = document.querySelector(".trail-grid");
                     break;
+                case 'tango':
+                    var grid = document.querySelector(".lotka-grid");
+                    break;
             }
 
             if (!grid) {
@@ -161,11 +222,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
 
             // Create mutation observer
             const observer = new MutationObserver(() => {
-                // Debounce rapid mutations
-                clearTimeout(window.queenUpdateTimeout);
-                window.queenUpdateTimeout = setTimeout(() => {
-                    chrome.runtime.sendMessage({ type: 'updateGrid' });
-                }, 100);
+                chrome.runtime.sendMessage({ type: 'updateGrid' });
             });
 
             // Start observing grid changes
@@ -191,6 +248,12 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         cell.appendChild(overlay);
                     });
                     break;
+                case 'tango':
+                    grid.querySelectorAll(".lotka-cell").forEach((cell, index) => {
+                        const overlay = createOverlayElement(cell, solution[index]);
+                        cell.appendChild(overlay);
+                    });
+                    break;
             }
 
             function createOverlayElement(cell, solutionState) {
@@ -204,7 +267,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     left: '0',
                     width: '100%',
                     height: '100%',
-                    zIndex: '1000',
+                    zIndex: '100',
                     pointerEvents: 'none'
                 });
 
@@ -230,6 +293,18 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         const blueValue = Math.max(Math.min(solutionState * 14.2 - 255, 255), 0);
                         overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Suggested position - green
                         break;
+                    case 'tango':
+                        // Check aria-label of the cells child div with class lotka-cell-content
+                        const cellState = cell.querySelector('svg').getAttribute('aria-label');
+
+                        // 0: empty, 1: sun, 2: moon
+                        if (cellState !== 'Sun' && solutionState === 1) {
+                            overlay.style.backgroundColor = 'rgba(255, 255, 0, 0.75)';  // Sun - yellow
+                        } else if (cellState !== 'Moon' && solutionState === 2) {
+                            overlay.style.backgroundColor = 'rgba(0, 0, 255, 0.75)';    // Moon - blue
+                        } else {
+                            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';         // Empty - transparent
+                        }
                 }
 
                 return overlay;
