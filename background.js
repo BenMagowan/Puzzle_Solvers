@@ -4,7 +4,7 @@ import * as zipSolver from './puzzles/zipSolver.js';
 const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.action.setBadgeText({ text: 'OFF' });
+    chrome.action.setBadgeText({ text: 'ON' });
 });
 
 async function toggleSolution(tab) {
@@ -70,23 +70,15 @@ async function getGridData(tabId, puzzleType) {
             return results[0].result;
         case 'zip':
             const zipGrid = [
+                6, 0, 0, 0, 0, 5,
                 0, 0, 0, 0, 0, 0,
-                0, 1, 0, 0, 0, 0,
-                0, 4, 0, 0, 0, 0,
-                0, 0, 0, 0, 3, 0,
-                0, 0, 0, 0, 2, 0,
+                0, 7, 1, 8, 2, 0,
+                0, 0, 0, 0, 0, 0,
+                3, 0, 0, 0, 0, 4,
                 0, 0, 0, 0, 0, 0
             ]
 
             const walls = [
-                [6, 7],
-                [12, 13],
-                [18, 19],
-                [24, 25],
-                [10, 11],
-                [16, 17],
-                [22, 23],
-                [28, 29]
             ];
 
             return [zipGrid, walls];
@@ -124,12 +116,43 @@ function findSolution(gridData, puzzleType) {
     }
 }
 
+async function removeOverlay(tabId) {
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        function: () => {
+            document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
+            if (window.gridObserver) {
+                window.gridObserver.disconnect();
+                delete window.gridObserver;
+            }
+        }
+    });
+}
+
 async function displayOverlay(tabId, solution, puzzleType) {
     await chrome.scripting.executeScript({
         target: { tabId },
         args: [solution, puzzleType],
         function: (solution, puzzleType) => {
-            // Cleanup previous state
+            var grid = null;
+            // Get current grid state
+            switch (puzzleType) {
+                case 'queens':
+                    var grid = document.getElementById("queens-grid");
+                    break;
+                case 'zip':
+                    var grid = document.querySelector(".trail-grid");
+                    break;
+            }
+
+            if (!grid) {
+                console.log('No grid found');
+                if (window.gridObserver) {
+                    window.gridObserver.disconnect();
+                    delete window.gridObserver;
+                }
+            }
+
             document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
             if (window.gridObserver) {
                 window.gridObserver.disconnect();
@@ -144,19 +167,6 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     chrome.runtime.sendMessage({ type: 'updateGrid' });
                 }, 100);
             });
-
-            var grid = null;
-            // Get current grid state
-            switch (puzzleType) {
-                case 'queens':
-                    var grid = document.getElementById("queens-grid");
-                    break;
-                case 'zip':
-                    var grid = document.querySelector(".trail-grid");
-                    break;
-            }
-
-            if (!grid) return;
 
             // Start observing grid changes
             observer.observe(grid, {
@@ -213,26 +223,16 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         }
                         break;
                     case 'zip':
-                        const greenValue = 255 - (255 / 36) * solutionState;
-                        const redValue = Math.min(255, Math.max(0, (255 / 36) * solutionState * 2));
-                        overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, 0, 0.75)`; // Suggested position - green
+                        // gradient from green to red to blue from 0 to 36
+                        // 0, 255, 0 -> 255, 0, 0 -> 0, 0, 255
+                        const greenValue = Math.max(Math.min(255 - solutionState * 14.2, 255), 0);
+                        const redValue = Math.max(Math.min(255 - Math.abs(255 - solutionState * 14.2), 255), 0);
+                        const blueValue = Math.max(Math.min(solutionState * 14.2 - 255, 255), 0);
+                        overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Suggested position - green
                         break;
                 }
 
                 return overlay;
-            }
-        }
-    });
-}
-
-async function removeOverlay(tabId) {
-    await chrome.scripting.executeScript({
-        target: { tabId },
-        function: () => {
-            document.querySelectorAll('.cell-overlay').forEach(el => el.remove());
-            if (window.queenObserver) {
-                window.queenObserver.disconnect();
-                delete window.queenObserver;
             }
         }
     });
@@ -246,3 +246,17 @@ chrome.runtime.onMessage.addListener(async (request, sender) => {
 
 // When the user clicks on the extension action
 chrome.action.onClicked.addListener(toggleSolution);
+
+chrome.tabs.onUpdated.addListener(async (_, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.active && tab.url) {
+        console.log('Tab updated', tab.url);
+        if (!tab.url.startsWith(LINKEDIN_GAMES_URL)) return;
+
+        const curState = await chrome.action.getBadgeText({ tabId: tab.id });
+        if (curState === 'ON') {
+            await initialiseExtension(tab);
+        } else {
+            await removeOverlay(tab.id);
+        }
+    }
+});
