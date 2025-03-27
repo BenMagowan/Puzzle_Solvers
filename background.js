@@ -68,7 +68,10 @@ async function getGridData(tabId, puzzleType) {
                     return colorString;
                 }
             });
-            return results[0].result;
+            const queensGrid = results[0].result;
+            const queens = new Array(queensGrid.length).fill('.');
+
+            return [queensGrid, queens];
         case 'zip':
             const zipGrid = [
                 6, 0, 0, 0, 0, 5,
@@ -140,8 +143,8 @@ async function getGridData(tabId, puzzleType) {
 function findSolution(gridData, puzzleType) {
     switch (puzzleType) {
         case 'queens':
-            const queensGrid = gridData.split('');
-            const queens = new Array(queensGrid.length).fill('.');
+            const queensGrid = gridData[0];
+            const queens = gridData[1];
 
             if (!queensSolver.solve(queensGrid, queens)) return null;
 
