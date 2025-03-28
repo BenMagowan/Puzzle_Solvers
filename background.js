@@ -35,12 +35,16 @@ async function initialiseExtension(tab) {
     if (!gridData) {
         console.log('No grid found');
         return;
+    } else {
+        console.log('Grid data:', gridData);
     }
 
     const solution = findSolution(gridData, puzzleType);
     if (!solution) {
         console.log('No solution found');
         return;
+    } else {
+        console.log('Solution:', solution);
     }
 
     await displayOverlay(tab.id, solution, puzzleType);
@@ -57,12 +61,12 @@ async function getGridData(tabId, puzzleType) {
 
                     const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
 
-                    let colorString = "";
+                    var colorString = [];
                     cells.forEach(cell => {
                         const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
                         if (colorClass) {
                             const colorNumber = colorClass.split("cell-color-")[1].trim();
-                            colorString += colorNumber;
+                            colorString.push(colorNumber);
                         }
                     });
                     return colorString;
@@ -316,6 +320,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
     });
 }
 
+// When the grid is updated
 chrome.runtime.onMessage.addListener(async (request, sender) => {
     if (request.type === 'updateGrid') {
         await initialiseExtension(sender.tab);
@@ -325,6 +330,7 @@ chrome.runtime.onMessage.addListener(async (request, sender) => {
 // When the user clicks on the extension action
 chrome.action.onClicked.addListener(toggleSolution);
 
+// When the tab is updated
 chrome.tabs.onUpdated.addListener(async (_, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.active && tab.url) {
         console.log('Tab updated', tab.url);
