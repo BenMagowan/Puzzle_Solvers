@@ -77,19 +77,50 @@ async function getGridData(tabId, puzzleType) {
 
             return [queensGrid, queens];
         case 'zip':
-            const zipGrid = [
-                6, 0, 0, 0, 0, 5,
-                0, 0, 0, 0, 0, 0,
-                0, 7, 1, 8, 2, 0,
-                0, 0, 0, 0, 0, 0,
-                3, 0, 0, 0, 0, 4,
-                0, 0, 0, 0, 0, 0
-            ]
+            const zipResults = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: () => {
+                    const zipGridElement = document.querySelector(".trail-grid");
+                    if (!zipGridElement) return null;
 
-            const walls = [
-            ];
+                    const cells = zipGridElement.querySelectorAll(".trail-cell");
 
-            const path = zipGrid.map(value => value === 1 ? 1 : 0);
+                    var zipGrid = [];
+                    var walls = [];
+                    // Loop through each cell
+                    cells.forEach((cell, index) => {
+                        // Loop though each child of the cell
+                        cell.querySelectorAll('div').forEach(child => {
+                            const className = child.getAttribute('class');
+                            if (className) {
+                                if (className.includes('trail-cell-wall--right')) {
+                                    walls.push([index, index + 1]);
+                                }
+                                if (className.includes('trail-cell-wall--down')) {
+                                    // Hardcoded for 6x6 grid
+                                    walls.push([index, index + 6]);
+                                }
+                                if (className.includes('trail-cell-content')) {
+                                    zipGrid.push(Number(child.textContent.trim()));
+                                }
+                            }
+                        });
+
+                        // If the cell is empty, add a 0 to the grid
+                        if (zipGrid.length < index + 1) {
+                            zipGrid.push(0);
+                        }
+                    });
+                    return [zipGrid, walls];
+                }
+            });
+            const zipGrid = zipResults[0].result[0];
+            var walls = zipResults[0].result[1];
+            var path = zipGrid.map(value => value === 1 ? 1 : 0);
+
+            walls = walls.concat(walls.map(([a, b]) => [b, a]));
+
+            console.log([zipGrid, walls, path]);
 
             return [zipGrid, walls, path];
         case 'tango':
@@ -107,24 +138,47 @@ async function getGridData(tabId, puzzleType) {
 
                     cells.forEach((cell, index) => {
                         const svgElements = cell.querySelectorAll('svg');
-                        const cellContent = Array.from(svgElements).map(svgElement => svgElement.getAttribute('aria-label'));
-                        // check if the cell class contains lotka-cell--locked
-                        if (cell.classList.contains('lotka-cell--locked')) {
-                            if (cellContent.includes('Sun')) {
-                                tangoGrid.push(1);
-                            } else if (cellContent.includes('Moon')) {
-                                tangoGrid.push(2);
+
+                        // loop through the svg elements and get the aria-label
+                        svgElements.forEach(svgElement => {
+                            const ariaLabel = svgElement.getAttribute('aria-label');
+                            if (ariaLabel) {
+                                // Definetly a better way to do this
+                                if (cell.classList.contains('lotka-cell--locked')) {
+                                    if (ariaLabel === 'Sun') {
+                                        tangoGrid.push(1);
+                                    } else if (ariaLabel === 'Moon') {
+                                        tangoGrid.push(2);
+                                    } else if (ariaLabel === 'Empty') {
+                                        tangoGrid.push(0);
+                                    }
+                                } else if (ariaLabel === 'Sun') {
+                                    tangoGrid.push(0);
+                                } else if (ariaLabel === 'Moon') {
+                                    tangoGrid.push(0);
+                                } else if (ariaLabel === 'Empty') {
+                                    tangoGrid.push(0);
+                                }
+
+                                const parentClass = svgElement.parentElement.classList;
+                                if (parentClass.contains('lotka-cell-edge--right')) {
+                                    if (ariaLabel === 'Equal') {
+                                        sameType.push([index, index + 1]);
+                                    } else if (ariaLabel === 'Cross') {
+                                        oppositeType.push([index, index + 1]);
+                                    }
+                                }
+                                if (parentClass.contains('lotka-cell-edge--down')) {
+                                    // Hardcoded for 6x6 grid
+                                    if (ariaLabel === 'Equal') {
+                                        sameType.push([index, index + 6]);
+                                    } else if (ariaLabel === 'Cross') {
+                                        oppositeType.push([index, index + 6]);
+                                    }
+                                }
                             }
-                        } else {
-                            tangoGrid.push(0);
                         }
-
-                        if (cellContent.includes('Equal')) {
-                            sameType.push([index, index + 1]);
-                        } else if (cellContent.includes('Cross')) {
-                            oppositeType.push([index, index + 1]);
-                        }
-
+                        );
                     });
 
                     return [tangoGrid, sameType, oppositeType];
