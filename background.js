@@ -283,7 +283,11 @@ async function displayOverlay(tabId, solution, puzzleType) {
 
             // Create mutation observer
             const observer = new MutationObserver(() => {
-                chrome.runtime.sendMessage({ type: 'updateGrid' });
+                if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+                    chrome.runtime.sendMessage({ type: 'updateGrid' });
+                } else {
+                    console.error('chrome.runtime.sendMessage is not available');
+                }
             });
 
             // Start observing grid changes
@@ -352,7 +356,14 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         const greenValue = Math.max(Math.min(255 - solutionState * 14.2, 255), 0);
                         const redValue = Math.max(Math.min(255 - Math.abs(255 - solutionState * 14.2), 255), 0);
                         const blueValue = Math.max(Math.min(solutionState * 14.2 - 255, 255), 0);
-                        overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Suggested position - green
+                        // Dont like this solution - potential fix - update solutionState 
+                        const isPathCell = Array.from(cell.querySelectorAll('div')).some(div => div.getAttribute('class').includes('trail-cell-segment'));
+
+                        if (!isPathCell) {
+                            overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Path - gradient
+                        } else {
+                            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)'; // Non-path - transparent
+                        }
                         break;
                     case 'tango':
                         // Check aria-label of the cells child div with class lotka-cell-content
@@ -366,6 +377,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         } else {
                             overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';         // Empty - transparent
                         }
+                        break;
                 }
 
                 return overlay;
