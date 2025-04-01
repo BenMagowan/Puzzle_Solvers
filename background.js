@@ -87,6 +87,7 @@ async function getGridData(tabId, puzzleType) {
 
                     var zipGrid = [];
                     var walls = [];
+                    const n = Math.sqrt(cells.length);
                     // Loop through each cell
                     cells.forEach((cell, index) => {
                         // Loop though each child of the cell
@@ -97,8 +98,7 @@ async function getGridData(tabId, puzzleType) {
                                     walls.push([index, index + 1]);
                                 }
                                 if (className.includes('trail-cell-wall--down')) {
-                                    // Hardcoded for 6x6 grid
-                                    walls.push([index, index + 6]);
+                                    walls.push([index, index + n]);
                                 }
                                 if (className.includes('trail-cell-content')) {
                                     zipGrid.push(Number(child.textContent.trim()));
@@ -135,6 +135,7 @@ async function getGridData(tabId, puzzleType) {
                     var tangoGrid = [];
                     var sameType = [];
                     var oppositeType = [];
+                    const n = Math.sqrt(cells.length);
 
                     cells.forEach((cell, index) => {
                         const svgElements = cell.querySelectorAll('svg');
@@ -145,16 +146,16 @@ async function getGridData(tabId, puzzleType) {
                             if (ariaLabel) {
                                 // Definetly a better way to do this
                                 if (cell.classList.contains('lotka-cell--locked')) {
-                                    if (ariaLabel === 'Sun') {
+                                    if (ariaLabel === 'Sun' || ariaLabel === 'Gold moon') {
                                         tangoGrid.push(1);
-                                    } else if (ariaLabel === 'Moon') {
+                                    } else if (ariaLabel === 'Moon' || ariaLabel === 'Blue moon') {
                                         tangoGrid.push(2);
                                     } else if (ariaLabel === 'Empty') {
                                         tangoGrid.push(0);
                                     }
-                                } else if (ariaLabel === 'Sun') {
+                                } else if (ariaLabel === 'Sun' || ariaLabel === 'Gold moon') {
                                     tangoGrid.push(0);
-                                } else if (ariaLabel === 'Moon') {
+                                } else if (ariaLabel === 'Moon' || ariaLabel === 'Blue moon') {
                                     tangoGrid.push(0);
                                 } else if (ariaLabel === 'Empty') {
                                     tangoGrid.push(0);
@@ -171,9 +172,9 @@ async function getGridData(tabId, puzzleType) {
                                 if (parentClass.contains('lotka-cell-edge--down')) {
                                     // Hardcoded for 6x6 grid
                                     if (ariaLabel === 'Equal') {
-                                        sameType.push([index, index + 6]);
+                                        sameType.push([index, index + n]);
                                     } else if (ariaLabel === 'Cross') {
-                                        oppositeType.push([index, index + 6]);
+                                        oppositeType.push([index, index + n]);
                                     }
                                 }
                             }
@@ -370,9 +371,9 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         const cellState = cell.querySelector('svg').getAttribute('aria-label');
 
                         // 0: empty, 1: sun, 2: moon
-                        if (cellState !== 'Sun' && solutionState === 1) {
+                        if (cellState !== 'Sun' && cellState !== 'Gold moon' && solutionState === 1) {
                             overlay.style.backgroundColor = 'rgba(255, 255, 0, 0.75)';  // Sun - yellow
-                        } else if (cellState !== 'Moon' && solutionState === 2) {
+                        } else if (cellState !== 'Moon' && cellState !== 'Blue moon' && solutionState === 2) {
                             overlay.style.backgroundColor = 'rgba(0, 0, 255, 0.75)';    // Moon - blue
                         } else {
                             overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';         // Empty - transparent
