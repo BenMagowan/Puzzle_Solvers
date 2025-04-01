@@ -372,9 +372,9 @@ async function displayOverlay(tabId, solution, puzzleType) {
 
                         // 0: empty, 1: sun, 2: moon
                         if (cellState !== 'Sun' && cellState !== 'Gold moon' && solutionState === 1) {
-                            overlay.style.backgroundColor = 'rgba(255, 255, 0, 0.75)';  // Sun - yellow
+                            overlay.style.backgroundColor = 'rgba(255, 179, 30, 0.75)';  // Sun - yellow
                         } else if (cellState !== 'Moon' && cellState !== 'Blue moon' && solutionState === 2) {
-                            overlay.style.backgroundColor = 'rgba(0, 0, 255, 0.75)';    // Moon - blue
+                            overlay.style.backgroundColor = 'rgba(76, 140, 230, 0.75)';    // Moon - blue
                         } else {
                             overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';         // Empty - transparent
                         }
