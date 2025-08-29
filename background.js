@@ -1,6 +1,7 @@
 import * as queensSolver from './puzzles/queensSolver.js';
 import * as zipSolver from './puzzles/zipSolver.js';
 import * as tangoSolver from './puzzles/tangoSolver.js';
+import * as miniSudokuSolver from './puzzles/miniSudokuSolver.js';
 
 const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
@@ -193,6 +194,27 @@ async function getGridData(tabId, puzzleType) {
             oppositeType = oppositeType.concat(oppositeType.map(([a, b]) => [b, a]));
 
             return [tangoGrid, sameType, oppositeType];
+        case 'mini-sudoku':
+            const miniSudokuResults = await chrome.scripting.executeScript({
+                target: { tabId: tabId },
+                function: () => {
+                    const miniSudokuGridElement = document.querySelector(".sudoku-board");
+                    if (!miniSudokuGridElement) return null;
+                    const cells = miniSudokuGridElement.querySelectorAll(".sudoku-cell");
+                    var miniSudokuGrid = [];
+                    cells.forEach(cell => {
+                        if (cell.classList.contains('sudoku-cell-prefilled')) {
+                            miniSudokuGrid.push(cell.textContent.trim());
+                        } else {
+                            miniSudokuGrid.push(".");
+                        }
+                    });
+                    return miniSudokuGrid;
+                }
+            });
+            const miniSudokuGrid = miniSudokuResults[0].result;
+
+            return [miniSudokuGrid];
         default:
             console.log('Unknown puzzle type');
             return null;
@@ -230,6 +252,14 @@ function findSolution(gridData, puzzleType) {
             tangoSolver.display(tangoGrid, sameType, oppositeType);
 
             return tangoGrid;
+        case 'mini-sudoku':
+            const miniSudokuGrid = gridData[0];
+
+            if (!miniSudokuSolver.solve(miniSudokuGrid)) return null;
+
+            miniSudokuSolver.display(miniSudokuGrid);
+
+            return miniSudokuGrid;
         default:
             console.log('Unknown puzzle type');
             return null;
@@ -265,6 +295,9 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     break;
                 case 'tango':
                     var grid = document.querySelector(".lotka-grid");
+                    break;
+                case 'mini-sudoku':
+                    var grid = document.querySelector(".sudoku-board");
                     break;
             }
 
@@ -316,6 +349,12 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     break;
                 case 'tango':
                     grid.querySelectorAll(".lotka-cell").forEach((cell, index) => {
+                        const overlay = createOverlayElement(cell, solution[index]);
+                        cell.appendChild(overlay);
+                    });
+                    break;
+                case 'mini-sudoku':
+                    grid.querySelectorAll(".sudoku-cell").forEach((cell, index) => {
                         const overlay = createOverlayElement(cell, solution[index]);
                         cell.appendChild(overlay);
                     });
@@ -377,6 +416,24 @@ async function displayOverlay(tabId, solution, puzzleType) {
                             overlay.style.backgroundColor = 'rgba(76, 140, 230, 0.75)';    // Moon - blue
                         } else {
                             overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';         // Empty - transparent
+                        }
+                        break;
+                    case 'mini-sudoku':
+                        const cellText = cell.textContent.trim();
+                        console.log(cellText)
+                        overlay.className = 'cell-overlay sudoku-cell-content';
+
+                        if (cellText === solutionState) {
+                            // Cell is correct
+                            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)';        // Correct position - transparent
+                        } else if (cellText === "") {
+                            // If the cell is empty and should be filled
+                            overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.75)'; // Suggested position - green
+                            overlay.textContent = solutionState; // Show solution
+                        } else {
+                            // Cell is filled but incorrect
+                            overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.75)';  // Incorrect position - red
+                            overlay.textContent = solutionState; // Show solution
                         }
                         break;
                 }
