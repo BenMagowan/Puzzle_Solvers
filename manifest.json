@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Puzzle Solver",
-  "description": "Automatically solve the linkedin games puzzles, kinda.",
+  "name": "LinkedIn Puzzle Solver",
+  "description": "Automatically solves LinkedIn puzzles, kinda.",
   "version": "1.0.0",
   "icons": {
     "16": "images/icon-16.png",
