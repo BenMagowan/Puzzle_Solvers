@@ -7,6 +7,14 @@ const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
 chrome.runtime.onInstalled.addListener(() => {
     console.log('Extension installed');
+    // Set default settings if not already set
+    const defaultSettings = {
+        'zipSolver': true,
+        'mini-sudokuSolver': true,
+        'tangoSolver': true,
+        'queensSolver': true
+    };
+    chrome.storage.local.set(defaultSettings);
 });
 
 async function initialiseExtension(tab) {
