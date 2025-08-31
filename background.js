@@ -40,7 +40,7 @@ async function initialiseExtension(tab) {
         console.log('Grid data:', gridData);
     }
 
-    const solution = findSolution(gridData, puzzleType);
+    const solution = await findSolution(gridData, puzzleType);
     if (!solution) {
         console.log('No solution found');
         return;
@@ -221,49 +221,67 @@ async function getGridData(tabId, puzzleType) {
     }
 }
 
-function findSolution(gridData, puzzleType) {
+async function findSolution(gridData, puzzleType) {
+    // Check if the puzzle has already been solved
+    const cacheKey = `${puzzleType}-${JSON.stringify(gridData)}`;
+
+    const cachedResult = await chrome.storage.local.get(cacheKey);
+
+    if (cachedResult[cacheKey]) {
+        console.log('Using cached result');
+        return cachedResult[cacheKey];
+    }
+
+    // Solve the puzzle
+    let solution = null;
+
     switch (puzzleType) {
         case 'queens':
             const queensGrid = gridData[0];
             const queens = gridData[1];
 
             if (!queensSolver.solve(queensGrid, queens)) return null;
-
             queensSolver.display(queensGrid, queens);
+            solution = queens;
+            break;
 
-            return queens;
         case 'zip':
             const zipGrid = gridData[0];
             const walls = gridData[1];
             const path = gridData[2];
 
             if (!zipSolver.solve(zipGrid, path, walls)) return null;
-
             zipSolver.display(path, walls);
+            solution = path;
+            break;
 
-            return path;
         case 'tango':
             const tangoGrid = gridData[0];
             const sameType = gridData[1];
             const oppositeType = gridData[2];
 
             if (!tangoSolver.solve(tangoGrid, sameType, oppositeType)) return null;
-
             tangoSolver.display(tangoGrid, sameType, oppositeType);
+            solution = tangoGrid;
+            break;
 
-            return tangoGrid;
         case 'mini-sudoku':
             const miniSudokuGrid = gridData[0];
 
             if (!miniSudokuSolver.solve(miniSudokuGrid)) return null;
-
             miniSudokuSolver.display(miniSudokuGrid);
+            solution = miniSudokuGrid;
+            break;
 
-            return miniSudokuGrid;
         default:
             console.log('Unknown puzzle type');
             return null;
     }
+
+    // Cache the result
+    await chrome.storage.local.set({ [cacheKey]: solution });
+
+    return solution;
 }
 
 async function removeOverlay(tabId) {
