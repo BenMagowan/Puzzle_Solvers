@@ -6,38 +6,29 @@ import * as miniSudokuSolver from './puzzles/miniSudokuSolver.js';
 const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.action.setBadgeText({ text: 'ON' });
+    console.log('Extension installed');
 });
-
-async function toggleSolution(tab) {
-    if (!tab.url.startsWith(LINKEDIN_GAMES_URL)) return;
-
-    const prevState = await chrome.action.getBadgeText({ tabId: tab.id });
-    const nextState = prevState === 'ON' ? 'OFF' : 'ON';
-
-    // Set the action badge to the next state
-    await chrome.action.setBadgeText({
-        tabId: tab.id,
-        text: nextState
-    });
-
-    if (nextState === 'ON') {
-        await initialiseExtension(tab);
-    } else if (nextState === 'OFF') {
-        await removeOverlay(tab.id);
-    }
-}
 
 async function initialiseExtension(tab) {
     const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].slice(0, -1);
-    console.log('Solving...', puzzleType);
+
+    const cachedResult = await chrome.storage.local.get(puzzleType + 'Solver');
+    const solverEnabled = cachedResult[puzzleType + 'Solver'];
+    if (!solverEnabled) {
+        console.log('Solver disabled');
+        await removeOverlay(tab.id);
+        return;
+    } else {
+        console.log('Solving', puzzleType);
+    }
 
     const gridData = await getGridData(tab.id, puzzleType);
     if (!gridData) {
         console.log('No grid found');
         return;
     } else {
-        console.log('Grid data:', gridData);
+        console.log('Grid data found');
+        // console.log('Grid data:', gridData);
     }
 
     const solution = await findSolution(gridData, puzzleType);
@@ -45,7 +36,7 @@ async function initialiseExtension(tab) {
         console.log('No solution found');
         return;
     } else {
-        console.log('Solution:', solution);
+        console.log('Solution found');
     }
 
     await displayOverlay(tab.id, solution, puzzleType);
@@ -438,7 +429,6 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         break;
                     case 'mini-sudoku':
                         const cellText = cell.textContent.trim();
-                        console.log(cellText)
                         overlay.className = 'cell-overlay sudoku-cell-content';
 
                         if (cellText === solutionState) {
@@ -466,23 +456,21 @@ async function displayOverlay(tabId, solution, puzzleType) {
 chrome.runtime.onMessage.addListener(async (request, sender) => {
     if (request.type === 'updateGrid') {
         await initialiseExtension(sender.tab);
+    } else if (request.type === 'reinitialize') {
+        const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0] && tabs[0].url && tabs[0].url.startsWith(LINKEDIN_GAMES_URL)) {
+            await initialiseExtension(tabs[0]);
+        }
     }
 });
-
-// When the user clicks on the extension action
-chrome.action.onClicked.addListener(toggleSolution);
 
 // When the tab is updated
 chrome.tabs.onUpdated.addListener(async (_, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.active && tab.url) {
         console.log('Tab updated', tab.url);
+
         if (!tab.url.startsWith(LINKEDIN_GAMES_URL)) return;
 
-        const curState = await chrome.action.getBadgeText({ tabId: tab.id });
-        if (curState === 'ON') {
-            await initialiseExtension(tab);
-        } else {
-            await removeOverlay(tab.id);
-        }
+        await initialiseExtension(tab);
     }
 });
