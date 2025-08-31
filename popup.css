@@ -2,11 +2,14 @@ body {
   font-family: Arial, sans-serif;
   margin: 10px;
   min-width: 220px;
+  background-color: #1D2226;
+  color: #ffffffcc;
 }
 
 h2 {
   font-size: 16px;
   margin-bottom: 10px;
+  color: rgb(255, 255, 255);
 }
 
 .setting {
@@ -39,8 +42,11 @@ label {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: #505050;
   border-radius: 24px;
+}
+
+.slider.loaded {
   transition: 0.2s;
 }
 
@@ -53,7 +59,10 @@ label {
   bottom: 3px;
   background-color: white;
   border-radius: 50%;
-  transition: 0.3s;
+}
+
+.slider.loaded:before {
+  transition: 0.2s;
 }
 
 input:checked + .slider {
@@ -65,25 +74,17 @@ input:checked + .slider:before {
 }
 
 button {
-  width: 100%;
-  padding: 8px;
-  background-color: #4285F4;
-  color: white;
+  background-color: #357AE8;
+  color: #ffffffcc;
   border: none;
+  padding: 8px 12px;
   border-radius: 4px;
-  font-size: 14px;
   cursor: pointer;
-  margin-top: 10px;
+  font-size: 14px;
+  width: 100%;
 }
 
 button:hover {
-  background-color: #357ae8;
-}
-
-#status {
-  font-size: 12px;
-  color: green;
-  display: none;
-  margin-top: 10px;
-  text-align: center;
+  background-color: #4285F4;
+  color: white;
 }
