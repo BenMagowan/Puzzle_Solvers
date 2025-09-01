@@ -18,7 +18,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 async function initialiseExtension(tab) {
-    const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].slice(0, -1);
+    const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].split('/')[0];
 
     const cachedResult = await chrome.storage.local.get(puzzleType + 'Solver');
     const solverEnabled = cachedResult[puzzleType + 'Solver'];
