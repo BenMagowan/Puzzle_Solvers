@@ -31,12 +31,13 @@ async function initialiseExtension(tab) {
     }
 
     const gridData = await getGridData(tab.id, puzzleType);
+    console.log(gridData);
     if (!gridData) {
         console.log('No grid found');
         return;
     } else {
         console.log('Grid data found');
-        // console.log('Grid data:', gridData);
+        console.log('Grid data:', gridData);
     }
 
     const solution = await findSolution(gridData, puzzleType);
@@ -79,11 +80,26 @@ async function getGridData(tabId, puzzleType) {
         case 'zip':
             const zipResults = await chrome.scripting.executeScript({
                 target: { tabId: tabId },
-                function: () => {
-                    const zipGridElement = document.querySelector(".trail-grid");
-                    if (!zipGridElement) return null;
+                function: async () => {
+                    function waitForElement(sel) {
+                        return new Promise(resolve => {
+                            const int = setInterval(() => {
+                                const el = document.querySelector(sel);
+                                if (el) {
+                                    clearInterval(int);
+                                    resolve(el);
+                                }
+                            }, 100);
+                        });
+                    }
 
-                    const cells = zipGridElement.querySelectorAll(".trail-cell");
+                    // Was trail-grid
+                    const zipGridElement = await waitForElement('[data-testid="interactive-grid"]');
+
+                    console.log(zipGridElement);
+
+                    // Was trail-cell
+                    const cells = zipGridElement.querySelectorAll("._97b44c20");
 
                     var zipGrid = [];
                     var walls = [];
@@ -94,13 +110,16 @@ async function getGridData(tabId, puzzleType) {
                         cell.querySelectorAll('div').forEach(child => {
                             const className = child.getAttribute('class');
                             if (className) {
+                                // Was trail-cell-wall--right
                                 if (className.includes('trail-cell-wall--right')) {
                                     walls.push([index, index + 1]);
                                 }
+                                // Was trail-cell-wall--down
                                 if (className.includes('trail-cell-wall--down')) {
                                     walls.push([index, index + n]);
                                 }
-                                if (className.includes('trail-cell-content')) {
+                                // Was trail-cell-content 
+                                if (className.includes('_2822018d')) {
                                     zipGrid.push(Number(child.textContent.trim()));
                                 }
                             }
@@ -197,7 +216,8 @@ async function getGridData(tabId, puzzleType) {
             const miniSudokuResults = await chrome.scripting.executeScript({
                 target: { tabId: tabId },
                 function: () => {
-                    const miniSudokuGridElement = document.querySelector(".sudoku-board");
+                    const miniSudokuGridElement = document.querySelector('.sudoku-board');
+                    console.log(miniSudokuGridElement);
                     if (!miniSudokuGridElement) return null;
                     const cells = miniSudokuGridElement.querySelectorAll(".sudoku-cell");
                     var miniSudokuGrid = [];
@@ -212,6 +232,7 @@ async function getGridData(tabId, puzzleType) {
                 }
             });
             const miniSudokuGrid = miniSudokuResults[0].result;
+            if (miniSudokuGrid === null) return null;
 
             return [miniSudokuGrid];
         default:
@@ -300,15 +321,28 @@ async function displayOverlay(tabId, solution, puzzleType) {
     await chrome.scripting.executeScript({
         target: { tabId },
         args: [solution, puzzleType],
-        function: (solution, puzzleType) => {
+        function: async (solution, puzzleType) => {
             var grid = null;
+
+            function waitForElement(sel) {
+                return new Promise(resolve => {
+                    const int = setInterval(() => {
+                        const el = document.querySelector(sel);
+                        if (el) {
+                            clearInterval(int);
+                            resolve(el);
+                        }
+                    }, 100);
+                });
+            }
+
             // Get current grid state
             switch (puzzleType) {
                 case 'queens':
                     var grid = document.getElementById("queens-grid");
                     break;
                 case 'zip':
-                    var grid = document.querySelector(".trail-grid");
+                    var grid = await waitForElement('[data-testid="interactive-grid"]');
                     break;
                 case 'tango':
                     var grid = document.querySelector(".lotka-grid");
@@ -359,7 +393,8 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     });
                     break;
                 case 'zip':
-                    grid.querySelectorAll(".trail-cell").forEach((cell, index) => {
+                    // Was trail-cell
+                    grid.querySelectorAll("._97b44c20").forEach((cell, index) => {
                         const overlay = createOverlayElement(cell, solution[index]);
                         cell.appendChild(overlay);
                     });
@@ -414,8 +449,8 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         const redValue = Math.max(Math.min(255 - Math.abs(255 - solutionState * 14.2), 255), 0);
                         const blueValue = Math.max(Math.min(solutionState * 14.2 - 255, 255), 0);
                         // Dont like this solution - potential fix - update solutionState 
-                        const isPathCell = Array.from(cell.querySelectorAll('div')).some(div => div.getAttribute('class').includes('trail-cell-segment'));
-
+                        const classAttribute = cell.getAttribute('class') || '';
+                        const isPathCell = classAttribute.includes('_8b9c854d'); // Was trail-cell-content
                         if (!isPathCell) {
                             overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Path - gradient
                         } else {
