@@ -5,123 +5,156 @@ import * as miniSudokuSolver from './puzzles/miniSudokuSolver.js';
 
 const LINKEDIN_GAMES_URL = 'https://www.linkedin.com/games/';
 
+const Logger = {
+    debug: (message, ...args) => {
+        console.log(`[DEBUG] ${message}`, ...args);
+    },
+    error: (message, error) => {
+        console.error(`[ERROR] ${message}`, error);
+        // Optionally send to analytics
+    },
+    info: (message, ...args) => {
+        console.log(`[INFO] ${message}`, ...args);
+    }
+};
+
+// On extension installation
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('Extension installed');
-    // Set default settings if not already set
+    Logger.info('Extension installed');
     const defaultSettings = {
         'zipSolver': true,
         'mini-sudokuSolver': true,
         'tangoSolver': true,
-        'queensSolver': true
+        'queensSolver': true,
+        'autoSolver': false,
+        'persistentOverlay': false
     };
     chrome.storage.local.set(defaultSettings);
 });
 
 async function initialiseExtension(tab) {
-    const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].split('/')[0];
+    try {
+        const puzzleType = tab.url.split(LINKEDIN_GAMES_URL)[1].split('/')[0];
+        if (!['zip', 'mini-sudoku', 'tango', 'queens'].includes(puzzleType)) {
+            Logger.info('Unsupported puzzle type:', puzzleType);
+            await removeOverlay(tab.id);
+            return;
+        }
 
-    const cachedResult = await chrome.storage.local.get(puzzleType + 'Solver');
-    const solverEnabled = cachedResult[puzzleType + 'Solver'];
-    if (!solverEnabled) {
-        console.log('Solver disabled');
+        const cachedResult = await chrome.storage.local.get(puzzleType + 'Solver');
+        const solverEnabled = cachedResult[puzzleType + 'Solver'];
+
+        if (!solverEnabled) {
+            Logger.info('Solver disabled for puzzle type:', puzzleType);
+            await removeOverlay(tab.id);
+            return;
+        } else {
+            Logger.info('Solving puzzle type:', puzzleType);
+        }
+
+        const gridData = await getGridData(tab.id, puzzleType);
+        Logger.debug('Grid data:', gridData);
+        if (!gridData) {
+            Logger.info('No grid found');
+            await removeOverlay(tab.id);
+            return;
+        } else {
+            Logger.info('Grid data found');
+        }
+
+        const solution = await findSolution(gridData, puzzleType);
+        if (!solution) {
+            Logger.info('No solution found');
+            await removeOverlay(tab.id);
+            return;
+        } else {
+            Logger.info('Solution found');
+        }
+
+        await displayOverlay(tab.id, solution, puzzleType);
+    } catch (error) {
+        Logger.error('Extension initialisation failed:', error);
         await removeOverlay(tab.id);
-        return;
-    } else {
-        console.log('Solving', puzzleType);
     }
 
-    const gridData = await getGridData(tab.id, puzzleType);
-    console.log(gridData);
-    if (!gridData) {
-        console.log('No grid found');
-        return;
-    } else {
-        console.log('Grid data found');
-        console.log('Grid data:', gridData);
-    }
-
-    const solution = await findSolution(gridData, puzzleType);
-    if (!solution) {
-        console.log('No solution found');
-        return;
-    } else {
-        console.log('Solution found');
-    }
-
-    await displayOverlay(tab.id, solution, puzzleType);
 }
 
 async function getGridData(tabId, puzzleType) {
-    switch (puzzleType) {
-        case 'queens':
-            const results = await chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                function: () => {
+    const results = await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        args: [puzzleType],
+        function: async (puzzleType) => {
+            function waitForElement(selector, timeout = 5000) {
+                return new Promise((resolve, reject) => {
+                    const existing = document.querySelector(selector);
+                    if (existing) return resolve(existing);
+
+                    const observer = new MutationObserver(() => {
+                        const el = document.querySelector(selector);
+                        if (el) {
+                            observer.disconnect();
+                            clearTimeout(timer);
+                            resolve(el);
+                        }
+                    });
+
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    const timer = setTimeout(() => {
+                        observer.disconnect();
+                        reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
+                    }, timeout);
+                });
+            }
+
+            switch (puzzleType) {
+                case 'queens':
                     const queensGrid = document.getElementById("queens-grid");
                     if (!queensGrid) return null;
 
-                    const cells = queensGrid.querySelectorAll(".queens-cell-with-border");
+                    const queensCells = queensGrid.querySelectorAll(".queens-cell-with-border");
 
                     var colorString = [];
-                    cells.forEach(cell => {
+                    queensCells.forEach(cell => {
                         const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
                         if (colorClass) {
                             const colorNumber = colorClass.split("cell-color-")[1].trim();
                             colorString.push(colorNumber);
                         }
                     });
-                    return colorString;
-                }
-            });
-            const queensGrid = results[0].result;
-            const queens = new Array(queensGrid.length).fill('.');
 
-            return [queensGrid, queens];
-        case 'zip':
-            const zipResults = await chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                function: async () => {
-                    function waitForElement(sel) {
-                        return new Promise(resolve => {
-                            const int = setInterval(() => {
-                                const el = document.querySelector(sel);
-                                if (el) {
-                                    clearInterval(int);
-                                    resolve(el);
-                                }
-                            }, 100);
-                        });
-                    }
+                    const queens = new Array(colorString.length).fill('.');
 
+                    return [colorString, queens];
+                case 'zip':
                     // Was trail-grid
                     const zipGridElement = await waitForElement('[data-testid="interactive-grid"]');
 
-                    console.log(zipGridElement);
-
                     // Was trail-cell
-                    const cells = zipGridElement.querySelectorAll("._97b44c20");
+                    const zipCells = zipGridElement.querySelectorAll('[data-cell-idx]');
 
                     var zipGrid = [];
                     var walls = [];
-                    const n = Math.sqrt(cells.length);
+                    const zipN = Math.sqrt(zipCells.length);
                     // Loop through each cell
-                    cells.forEach((cell, index) => {
+                    zipCells.forEach((cell, index) => {
                         // Loop though each child of the cell
                         cell.querySelectorAll('div').forEach(child => {
                             const className = child.getAttribute('class');
-                            if (className) {
-                                // Was trail-cell-wall--right
-                                if (className.includes('trail-cell-wall--right')) {
-                                    walls.push([index, index + 1]);
-                                }
-                                // Was trail-cell-wall--down
-                                if (className.includes('trail-cell-wall--down')) {
-                                    walls.push([index, index + n]);
-                                }
-                                // Was trail-cell-content 
-                                if (className.includes('_2822018d')) {
-                                    zipGrid.push(Number(child.textContent.trim()));
-                                }
+                            // Was trail-cell-wall--right
+                            if (className.includes('trail-cell-wall--right')) {
+                                walls.push([index, index + 1]);
+                            }
+                            // Was trail-cell-wall--down
+                            if (className.includes('trail-cell-wall--down')) {
+                                walls.push([index, index + zipN]);
+                            }
+                            // Was trail-cell-content 
+                            if (child.getAttribute('data-cell-content') === "true") {
+                                zipGrid.push(Number(child.textContent.trim()));
                             }
                         });
 
@@ -130,33 +163,23 @@ async function getGridData(tabId, puzzleType) {
                             zipGrid.push(0);
                         }
                     });
-                    return [zipGrid, walls];
-                }
-            });
-            const zipGrid = zipResults[0].result[0];
-            var walls = zipResults[0].result[1];
-            var path = zipGrid.map(value => value === 1 ? 1 : 0);
 
-            walls = walls.concat(walls.map(([a, b]) => [b, a]));
+                    var path = zipGrid.map(value => value === 1 ? 1 : 0);
 
-            console.log([zipGrid, walls, path]);
-
-            return [zipGrid, walls, path];
-        case 'tango':
-            const tangoResults = await chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                function: () => {
+                    walls = walls.concat(walls.map(([a, b]) => [b, a]));
+                    return [zipGrid, walls, path];
+                case 'tango':
                     const tangoGridElement = document.querySelector(".lotka-grid");
                     if (!tangoGridElement) return null;
 
-                    const cells = tangoGridElement.querySelectorAll(".lotka-cell");
+                    const tangoCells = tangoGridElement.querySelectorAll(".lotka-cell");
 
                     var tangoGrid = [];
                     var sameType = [];
                     var oppositeType = [];
-                    const n = Math.sqrt(cells.length);
+                    const tangoN = Math.sqrt(tangoCells.length);
 
-                    cells.forEach((cell, index) => {
+                    tangoCells.forEach((cell, index) => {
                         const svgElements = cell.querySelectorAll('svg');
 
                         // loop through the svg elements and get the aria-label
@@ -191,54 +214,41 @@ async function getGridData(tabId, puzzleType) {
                                 if (parentClass.contains('lotka-cell-edge--down')) {
                                     // Hardcoded for 6x6 grid
                                     if (ariaLabel === 'Equal') {
-                                        sameType.push([index, index + n]);
+                                        sameType.push([index, index + tangoN]);
                                     } else if (ariaLabel === 'Cross') {
-                                        oppositeType.push([index, index + n]);
+                                        oppositeType.push([index, index + tangoN]);
                                     }
                                 }
                             }
                         }
                         );
                     });
+                    sameType = sameType.concat(sameType.map(([a, b]) => [b, a]));
+                    oppositeType = oppositeType.concat(oppositeType.map(([a, b]) => [b, a]));
 
                     return [tangoGrid, sameType, oppositeType];
-                }
-            });
-            const tangoGrid = tangoResults[0].result[0];
-            var sameType = tangoResults[0].result[1];
-            var oppositeType = tangoResults[0].result[2];
-
-            sameType = sameType.concat(sameType.map(([a, b]) => [b, a]));
-            oppositeType = oppositeType.concat(oppositeType.map(([a, b]) => [b, a]));
-
-            return [tangoGrid, sameType, oppositeType];
-        case 'mini-sudoku':
-            const miniSudokuResults = await chrome.scripting.executeScript({
-                target: { tabId: tabId },
-                function: () => {
+                case 'mini-sudoku':
                     const miniSudokuGridElement = document.querySelector('.sudoku-board');
                     console.log(miniSudokuGridElement);
                     if (!miniSudokuGridElement) return null;
-                    const cells = miniSudokuGridElement.querySelectorAll(".sudoku-cell");
+                    const sudokuCells = miniSudokuGridElement.querySelectorAll(".sudoku-cell");
                     var miniSudokuGrid = [];
-                    cells.forEach(cell => {
+                    sudokuCells.forEach(cell => {
                         if (cell.classList.contains('sudoku-cell-prefilled')) {
                             miniSudokuGrid.push(cell.textContent.trim());
                         } else {
                             miniSudokuGrid.push(".");
                         }
                     });
-                    return miniSudokuGrid;
-                }
-            });
-            const miniSudokuGrid = miniSudokuResults[0].result;
-            if (miniSudokuGrid === null) return null;
+                    return [miniSudokuGrid];
+                default:
+                    console.log('Unknown puzzle type');
+                    return null;
+            }
+        }
 
-            return [miniSudokuGrid];
-        default:
-            console.log('Unknown puzzle type');
-            return null;
-    }
+    });
+    return results[0].result;
 }
 
 async function findSolution(gridData, puzzleType) {
@@ -324,15 +334,29 @@ async function displayOverlay(tabId, solution, puzzleType) {
         function: async (solution, puzzleType) => {
             var grid = null;
 
-            function waitForElement(sel) {
-                return new Promise(resolve => {
-                    const int = setInterval(() => {
-                        const el = document.querySelector(sel);
+            function waitForElement(selector, timeout = 5000) {
+                return new Promise((resolve, reject) => {
+                    const existing = document.querySelector(selector);
+                    if (existing) return resolve(existing);
+
+                    const observer = new MutationObserver(() => {
+                        const el = document.querySelector(selector);
                         if (el) {
-                            clearInterval(int);
+                            observer.disconnect();
+                            clearTimeout(timer);
                             resolve(el);
                         }
-                    }, 100);
+                    });
+
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    const timer = setTimeout(() => {
+                        observer.disconnect();
+                        reject(new Error(`Element "${selector}" not found within ${timeout}ms`));
+                    }, timeout);
                 });
             }
 
@@ -393,8 +417,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     });
                     break;
                 case 'zip':
-                    // Was trail-cell
-                    grid.querySelectorAll("._97b44c20").forEach((cell, index) => {
+                    grid.querySelectorAll('[data-cell-idx]').forEach((cell, index) => {
                         const overlay = createOverlayElement(cell, solution[index]);
                         cell.appendChild(overlay);
                     });
@@ -449,12 +472,11 @@ async function displayOverlay(tabId, solution, puzzleType) {
                         const redValue = Math.max(Math.min(255 - Math.abs(255 - solutionState * 14.2), 255), 0);
                         const blueValue = Math.max(Math.min(solutionState * 14.2 - 255, 255), 0);
                         // Dont like this solution - potential fix - update solutionState 
-                        const classAttribute = cell.getAttribute('class') || '';
-                        const isPathCell = classAttribute.includes('_8b9c854d'); // Was trail-cell-content
-                        if (!isPathCell) {
-                            overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Path - gradient
+                        // If one of the children has data-testid="filled-cell"
+                        if (cell.querySelector('[data-testid="filled-cell"]')) {
+                            overlay.style.backgroudColor = 'rgba(0, 0, 0, 0)'; // Non-path - transparent
                         } else {
-                            overlay.style.backgroundColor = 'rgba(0, 0, 0, 0)'; // Non-path - transparent
+                            overlay.style.backgroundColor = `rgba(${redValue}, ${greenValue}, ${blueValue}, 0.75)`; // Path - gradient
                         }
                         break;
                     case 'tango':

@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const settings = ['zipSolver', 'mini-sudokuSolver', 'tangoSolver', 'queensSolver'];
+    const settings = ['zipSolver', 'mini-sudokuSolver', 'tangoSolver', 'queensSolver', 'autoSolver', 'persistentOverlay'];
     const clearCacheButton = document.getElementById('clearCache');
     const encoder = new TextEncoder();
 

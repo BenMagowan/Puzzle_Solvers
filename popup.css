@@ -12,6 +12,12 @@ h2 {
   color: rgb(255, 255, 255);
 }
 
+hr {
+  border: none;
+  border-top: 1px solid #505050;
+  margin: 16px 0;
+}
+
 .setting {
   margin-bottom: 12px;
 }
