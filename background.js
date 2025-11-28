@@ -11,7 +11,11 @@ const Logger = {
     },
     error: (message, error) => {
         console.error(`[ERROR] ${message}`, error);
-        // Optionally send to analytics
+        // Send to analytics
+        gtag('event', 'exception', {
+            description: `${message} - ${error.message}`,
+            fatal: false
+        });
     },
     info: (message, ...args) => {
         console.log(`[INFO] ${message}`, ...args);
@@ -112,28 +116,29 @@ async function getGridData(tabId, puzzleType) {
 
             switch (puzzleType) {
                 case 'queens':
-                    const queensGrid = document.getElementById("queens-grid");
-                    if (!queensGrid) return null;
+                    const queensGrid = await waitForElement('[data-testid="interactive-grid"]')
 
-                    const queensCells = queensGrid.querySelectorAll(".queens-cell-with-border");
+                    const queensCells = queensGrid.querySelectorAll('[data-cell-idx]');
 
                     var colorString = [];
+                    var classIndexByName = new Map();
                     queensCells.forEach(cell => {
-                        const colorClass = Array.from(cell.classList).find(cls => cls.startsWith("cell-color-"));
-                        if (colorClass) {
-                            const colorNumber = colorClass.split("cell-color-")[1].trim();
-                            colorString.push(colorNumber);
+                        // The last class name is unique to the colour
+                        const className = cell.className.trim().split(' ').pop();
+
+                        if (!classIndexByName.has(className)) {
+                            classIndexByName.set(className, classIndexByName.size);
                         }
+
+                        colorString.push(classIndexByName.get(className));
                     });
 
                     const queens = new Array(colorString.length).fill('.');
 
                     return [colorString, queens];
                 case 'zip':
-                    // Was trail-grid
                     const zipGridElement = await waitForElement('[data-testid="interactive-grid"]');
 
-                    // Was trail-cell
                     const zipCells = zipGridElement.querySelectorAll('[data-cell-idx]');
 
                     var zipGrid = [];
@@ -143,16 +148,15 @@ async function getGridData(tabId, puzzleType) {
                     zipCells.forEach((cell, index) => {
                         // Loop though each child of the cell
                         cell.querySelectorAll('div').forEach(child => {
-                            const className = child.getAttribute('class');
-                            // Was trail-cell-wall--right
-                            if (className.includes('trail-cell-wall--right')) {
+                            // wall right
+                            if (child.className.includes('dd185cab')) {
                                 walls.push([index, index + 1]);
                             }
-                            // Was trail-cell-wall--down
-                            if (className.includes('trail-cell-wall--down')) {
+                            // wall down
+                            if (child.className.includes('_2f62539a')) {
                                 walls.push([index, index + zipN]);
                             }
-                            // Was trail-cell-content 
+                            // contains content
                             if (child.getAttribute('data-cell-content') === "true") {
                                 zipGrid.push(Number(child.textContent.trim()));
                             }
@@ -169,10 +173,9 @@ async function getGridData(tabId, puzzleType) {
                     walls = walls.concat(walls.map(([a, b]) => [b, a]));
                     return [zipGrid, walls, path];
                 case 'tango':
-                    const tangoGridElement = document.querySelector(".lotka-grid");
-                    if (!tangoGridElement) return null;
+                    const tangoGridElement = await waitForElement('[data-testid="interactive-grid"]');
 
-                    const tangoCells = tangoGridElement.querySelectorAll(".lotka-cell");
+                    const tangoCells = tangoGridElement.querySelectorAll('[data-cell-idx]');
 
                     var tangoGrid = [];
                     var sameType = [];
@@ -187,31 +190,33 @@ async function getGridData(tabId, puzzleType) {
                             const ariaLabel = svgElement.getAttribute('aria-label');
                             if (ariaLabel) {
                                 // Definetly a better way to do this
-                                if (cell.classList.contains('lotka-cell--locked')) {
-                                    if (ariaLabel === 'Sun' || ariaLabel === 'Gold moon') {
+                                if (cell.ariaDisabled === 'true') {
+                                    if (ariaLabel === 'Sun') {
                                         tangoGrid.push(1);
-                                    } else if (ariaLabel === 'Moon' || ariaLabel === 'Blue moon') {
+                                    } else if (ariaLabel === 'Moon') {
                                         tangoGrid.push(2);
                                     } else if (ariaLabel === 'Empty') {
                                         tangoGrid.push(0);
                                     }
-                                } else if (ariaLabel === 'Sun' || ariaLabel === 'Gold moon') {
+                                } else if (ariaLabel === 'Sun') {
                                     tangoGrid.push(0);
-                                } else if (ariaLabel === 'Moon' || ariaLabel === 'Blue moon') {
+                                } else if (ariaLabel === 'Moon') {
                                     tangoGrid.push(0);
                                 } else if (ariaLabel === 'Empty') {
                                     tangoGrid.push(0);
                                 }
 
+                                // Right
                                 const parentClass = svgElement.parentElement.classList;
-                                if (parentClass.contains('lotka-cell-edge--right')) {
+                                if (parentClass.contains('c98406a0')) {
                                     if (ariaLabel === 'Equal') {
                                         sameType.push([index, index + 1]);
                                     } else if (ariaLabel === 'Cross') {
                                         oppositeType.push([index, index + 1]);
                                     }
                                 }
-                                if (parentClass.contains('lotka-cell-edge--down')) {
+                                // Down
+                                if (parentClass.contains('_220223b4')) {
                                     // Hardcoded for 6x6 grid
                                     if (ariaLabel === 'Equal') {
                                         sameType.push([index, index + tangoN]);
@@ -229,7 +234,6 @@ async function getGridData(tabId, puzzleType) {
                     return [tangoGrid, sameType, oppositeType];
                 case 'mini-sudoku':
                     const miniSudokuGridElement = document.querySelector('.sudoku-board');
-                    console.log(miniSudokuGridElement);
                     if (!miniSudokuGridElement) return null;
                     const sudokuCells = miniSudokuGridElement.querySelectorAll(".sudoku-cell");
                     var miniSudokuGrid = [];
@@ -363,13 +367,13 @@ async function displayOverlay(tabId, solution, puzzleType) {
             // Get current grid state
             switch (puzzleType) {
                 case 'queens':
-                    var grid = document.getElementById("queens-grid");
+                    var grid = await waitForElement('[data-testid="interactive-grid"]');
                     break;
                 case 'zip':
                     var grid = await waitForElement('[data-testid="interactive-grid"]');
                     break;
                 case 'tango':
-                    var grid = document.querySelector(".lotka-grid");
+                    var grid = await waitForElement('[data-testid="interactive-grid"]');
                     break;
                 case 'mini-sudoku':
                     var grid = document.querySelector(".sudoku-board");
@@ -411,7 +415,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
             // Create visual overlays
             switch (puzzleType) {
                 case 'queens':
-                    grid.querySelectorAll(".queens-cell-with-border").forEach((cell, index) => {
+                    grid.querySelectorAll('[data-cell-idx]').forEach((cell, index) => {
                         const overlay = createOverlayElement(cell, solution[index]);
                         cell.appendChild(overlay);
                     });
@@ -423,7 +427,7 @@ async function displayOverlay(tabId, solution, puzzleType) {
                     });
                     break;
                 case 'tango':
-                    grid.querySelectorAll(".lotka-cell").forEach((cell, index) => {
+                    grid.querySelectorAll('[data-cell-idx]').forEach((cell, index) => {
                         const overlay = createOverlayElement(cell, solution[index]);
                         cell.appendChild(overlay);
                     });
