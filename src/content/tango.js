@@ -1,0 +1,127 @@
+// Tango solver
+console.log('[TANGO] Script loaded');
+
+function extractGrid() {
+    // TODO: Implement grid extraction for Tango puzzle
+    return null;
+}
+
+function pairInList(list, a, b) {
+    return list.some(pair => pair[0] === a && pair[1] === b);
+}
+
+function solve(grid, sameType, oppositeType) {
+    function findEmpty(grid) {
+        for (let i = 0; i < grid.length; i++) {
+            if (grid[i] === 0) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function isValid(grid, sameType, oppositeType) {
+        const N = 6;
+        // Check rows for three consecutive same non-zero values
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N - 2; j++) {
+                let a = grid[i * N + j];
+                let b = grid[i * N + j + 1];
+                let c = grid[i * N + j + 2];
+                if (a !== 0 && a === b && b === c) {
+                    return false;
+                }
+            }
+        }
+        // Check columns for three consecutive same non-zero values
+        for (let i = 0; i < N; i++) {
+            for (let j = 0; j < N - 2; j++) {
+                let a = grid[j * N + i];
+                let b = grid[(j + 1) * N + i];
+                let c = grid[(j + 2) * N + i];
+                if (a !== 0 && a === b && b === c) {
+                    return false;
+                }
+            }
+        }
+        // Check same type pairs
+        for (const [a, b] of sameType) {
+            if (grid[a] !== 0 && grid[b] !== 0 && grid[a] !== grid[b]) {
+                return false;
+            }
+        }
+        // Check opposite type pairs
+        for (const [a, b] of oppositeType) {
+            if (grid[a] !== 0 && grid[b] !== 0 && grid[a] === grid[b]) {
+                return false;
+            }
+        }
+
+        // Check if more then 3 suns or moon in a row
+        for (let i = 0; i < N; i++) {
+            const row = grid.slice(i * N, i * N + N);
+            const countSun = row.filter(cell => cell === 1).length;
+            const countMoon = row.filter(cell => cell === 2).length;
+            if (countSun > 3 || countMoon > 3) {
+                return false;
+            }
+        }
+
+        // Check if more then 3 suns or moon in a column
+        for (let i = 0; i < N; i++) {
+            const column = grid.filter((_, idx) => idx % N === i);
+            const countSun = column.filter(cell => cell === 1).length;
+            const countMoon = column.filter(cell => cell === 2).length;
+            if (countSun > 3 || countMoon > 3) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    const pos = findEmpty(grid);
+    if (pos === -1) {
+        return true;
+    }
+
+    for (let num = 1; num <= 2; num++) {
+        grid[pos] = num;
+        if (isValid(grid, sameType, oppositeType)) {
+            if (solve(grid, sameType, oppositeType)) {
+                return true;
+            }
+        }
+        grid[pos] = 0;
+    }
+    return false;
+}
+
+function overlay(solution) {
+    console.log('[TANGO] Solution:', solution);
+    // TODO: Implement overlay for Tango puzzle
+}
+
+function init() {
+    console.log('[TANGO] Initializing solver');
+    const data = extractGrid();
+    if (!data) {
+        console.error('[TANGO] Failed to extract grid');
+        return;
+    }
+    
+    const { grid, sameType, oppositeType } = data;
+    if (!solve(grid, sameType, oppositeType)) {
+        console.error('[TANGO] No solution found');
+        return;
+    }
+    console.log('[TANGO] Solution found:', grid);
+    overlay(grid);
+}
+
+// Run when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    setTimeout(init, 1000);
+}
