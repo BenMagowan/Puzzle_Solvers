@@ -1,63 +1,4 @@
-function pairInList(list, a, b) {
-    return list.some(pair => pair[0] === a && pair[1] === b);
-}
-
-function display(grid, sameType, oppositeType) {
-    const N = 6;
-    const CELL_WIDTH = 3;
-    let topBorder = '┌' + (("─".repeat(CELL_WIDTH) + "┬").repeat(N - 1)) + "─".repeat(CELL_WIDTH) + '┐';
-    console.log(topBorder);
-
-    for (let i = 0; i < N; i++) {
-        let rowStr = '│';
-        for (let j = 0; j < N; j++) {
-            let cellIndex = i * N + j;
-            let symbol = ' ';
-            if (grid[cellIndex] === 1) {
-                symbol = '☀';
-            } else if (grid[cellIndex] === 2) {
-                symbol = '☽';
-            }
-            // Determine vertical divider between cell j and j+1.
-            let divider = '│';
-            if (j < N - 1) {
-                let currentIndex = cellIndex;
-                let nextIndex = cellIndex + 1;
-                if (pairInList(sameType, currentIndex, nextIndex)) {
-                    divider = '=';
-                } else if (pairInList(oppositeType, currentIndex, nextIndex)) {
-                    divider = 'x';
-                }
-            }
-            // Pad cell content to CELL_WIDTH (here fixed as 3: one space, symbol, one space)
-            rowStr += ' ' + symbol + ' ' + divider;
-        }
-        console.log(rowStr);
-
-        // Print horizontal separator between rows (except after the last row)
-        if (i !== N - 1) {
-            let sep = '├';
-            for (let j = 0; j < N; j++) {
-                let currentIndex = i * N + j;
-                let belowIndex = (i + 1) * N + j;
-                let sepDivider = '─';
-                if (pairInList(sameType, currentIndex, belowIndex)) {
-                    sepDivider = '=';
-                } else if (pairInList(oppositeType, currentIndex, belowIndex)) {
-                    sepDivider = 'x';
-                }
-                // Build separator cell: left border, then the divider character repeated with padding.
-                sep += "─" + sepDivider + "─" + (j === N - 1 ? "┤" : "┼");
-            }
-            console.log(sep);
-        }
-    }
-
-    let bottomBorder = '└' + (("─".repeat(CELL_WIDTH) + "┴").repeat(N - 1)) + "─".repeat(CELL_WIDTH) + '┘';
-    console.log(bottomBorder);
-}
-
-function solve(grid, sameType, oppositeType) {
+export function solve(grid, sameType, oppositeType) {
     function findEmpty(grid) {
         for (let i = 0; i < grid.length; i++) {
             if (grid[i] === 0) {
@@ -143,5 +84,3 @@ function solve(grid, sameType, oppositeType) {
     }
     return false;
 }
-
-export { solve, display };

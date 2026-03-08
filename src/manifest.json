@@ -13,7 +13,11 @@
         {
             "matches": ["*://*.linkedin.com/games/queens*"],
             "js": [
+                "shared/logger.js",
+                "shared/settings.js",
                 "content/common/dom-utils.js",
+                "content/common/grid-reader.js",
+                "content/common/overlay.js",
                 "solvers/queens-solver.js",
                 "content/queens.js"
             ]
@@ -21,6 +25,7 @@
         {
             "matches": ["*://*.linkedin.com/games/zip*"],
             "js": [
+                "shared/logger.js",
                 "content/common/dom-utils.js",
                 "solvers/zip-solver.js",
                 "content/zip.js"
@@ -29,6 +34,7 @@
         {
             "matches": ["*://*.linkedin.com/games/tango*"],
             "js": [
+                "shared/logger.js",
                 "content/common/dom-utils.js",
                 "solvers/tango-solver.js",
                 "content/tango.js"
@@ -37,9 +43,10 @@
         {
             "matches": ["*://*.linkedin.com/games/*sudo*"],
             "js": [
+                "shared/logger.js",
                 "content/common/dom-utils.js",
-                "solvers/miniSudoku-solver.js",
-                "content/miniSudoku.js"
+                "solvers/mini-sudoku-solver.js",
+                "content/mini-sudoku.js"
             ]
         }
     ],
@@ -48,7 +55,7 @@
         "type": "module"
     },
     "action": {
-        "default_popup": "src/popup/popup.html",
+        "default_popup": "popup/popup.html",
         "default_icon": {
             "16": "images/icon-16.png",
             "32": "images/icon-32.png",
