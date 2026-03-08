@@ -44,14 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add change listener for auto-save
     settings.forEach(setting => {
-        document.getElementById(setting).addEventListener('change', () => {
+        document.getElementById(setting).addEventListener('change', async () => {
             const newValue = document.getElementById(setting).checked;
             chrome.storage.local.set({ [setting]: newValue });
             console.log(`Setting ${setting} to ${newValue}`);
 
-            // Send message to background script to reinitialize
-            console.log('Sending reinitialize message');
-            chrome.runtime.sendMessage({ type: 'reinitialize' });
+            // Send message to all game tabs to update overlay without reloading
+            try {
+                const tabs = await chrome.tabs.query({ url: 'https://www.linkedin.com/games/*' });
+                console.log(`Notifying ${tabs.length} game tab(s) of setting change`);
+                tabs.forEach(tab => {
+                    chrome.tabs.sendMessage(tab.id, {
+                        type: 'settingChanged',
+                        setting: setting,
+                        enabled: newValue
+                    }).catch(() => { }); // Ignore errors for tabs that don't have content script
+                });
+            } catch (e) {
+                console.error('Failed to notify tabs:', e);
+            }
         });
     });
 

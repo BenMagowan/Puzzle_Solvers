@@ -48,13 +48,13 @@ function applyQueensOverlay(gridData, solution) {
         overlay.style.boxSizing = 'border-box';
 
         if (hasQueen && shouldBeQueen) {
-            overlay.style.border = '3px solid rgba(0, 200, 0, 0.8)';
+            overlay.style.border = '3px solid rgba(0, 200, 0, 0.9)';
         } else if (hasQueen && !shouldBeQueen) {
-            overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.4)';
-            overlay.style.border = '3px solid rgba(255, 0, 0, 0.8)';
+            overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.6)';
+            overlay.style.border = '3px solid rgba(255, 0, 0, 0.9)';
         } else if (shouldBeQueen) {
-            overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.30)';
-            overlay.style.border = '3px solid rgba(0, 200, 0, 0.8)';
+            overlay.style.backgroundColor = 'rgba(0, 255, 0, 0.6)';
+            overlay.style.border = '3px solid rgba(0, 200, 0, 0.9)';
         }
 
         cell.appendChild(overlay);

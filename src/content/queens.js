@@ -6,12 +6,16 @@
  */
 (function () {
     var TAG = 'QUEENS';
+    var currentSolution = null;
+    var currentGridData = null;
+    var solverEnabled = true; // Track current enabled state
 
     function init() {
         PuzzleLogger.log(TAG, 'Content script loaded on ' + location.href);
 
         // ── Check whether the solver is enabled in settings ──
         getSolverEnabled('queensSolver').then(function (enabled) {
+            solverEnabled = enabled;
             if (!enabled) {
                 PuzzleLogger.log(TAG, 'Solver is disabled in settings, exiting');
                 return;
@@ -27,7 +31,7 @@
             .then(function () {
                 PuzzleLogger.log(TAG, 'Grid element found');
                 // Give React a moment to finish rendering cell contents
-                return delay(600);
+                return delay(100);
             })
             .then(function () {
                 var gridData = extractQueensGrid();
@@ -62,6 +66,10 @@
                 PuzzleLogger.log(TAG, 'Solution found');
                 PuzzleLogger.debug(TAG, 'Solution: ' + queens.join(''));
 
+                // ── Store solution for later use ──
+                currentSolution = queens;
+                currentGridData = gridData;
+
                 // ── Apply visual overlay ──
                 applyQueensOverlay(gridData, queens);
                 PuzzleLogger.log(TAG, 'Overlay applied');
@@ -94,6 +102,8 @@
         var observer = new MutationObserver(function () {
             clearTimeout(timer);
             timer = setTimeout(function () {
+                // Only re-apply if solver is still enabled
+                if (!solverEnabled) return;
                 var fresh = extractQueensGrid();
                 if (fresh) applyQueensOverlay(fresh, queens);
             }, 250);
@@ -123,10 +133,33 @@
         } catch (_) { /* ignore */ }
     }
 
+    // ── Listen for setting changes from popup ──
+    chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+        if (msg.type === 'settingChanged' && msg.setting === 'queensSolver') {
+            PuzzleLogger.log(TAG, 'Setting changed: queensSolver = ' + msg.enabled);
+            solverEnabled = msg.enabled; // Update tracked state
+
+            if (msg.enabled && currentSolution && currentGridData) {
+                // Re-apply overlay if we have a solution
+                PuzzleLogger.log(TAG, 'Applying overlay');
+                applyQueensOverlay(currentGridData, currentSolution);
+            } else if (msg.enabled) {
+                // No solution currently stored, try to find and solve again
+                PuzzleLogger.log(TAG, 'No current solution, attempting to find and solve');
+                init();
+            } else if (!msg.enabled) {
+                // Remove overlay
+                PuzzleLogger.log(TAG, 'Removing overlay');
+                removeQueensOverlay();
+            }
+        }
+        return false;
+    });
+
     // ── Kick off ──
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
-        setTimeout(init, 300);
+        setTimeout(init, 100);
     }
 })();

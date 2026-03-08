@@ -81,9 +81,9 @@ chrome.runtime.onMessage.addListener((msg, sender, _sendResponse) => {
                 ' — tab ' + tabId + ' ' + tabUrl);
             break;
 
-        // ── Settings changed via popup ──
+        // ── Settings changed via popup (legacy fallback) ──
         case 'reinitialize':
-            log.info(SW, 'Reinitialize request from popup — reloading game tabs');
+            log.info(SW, 'Reinitialize request (legacy) — reloading game tabs');
             reinitializeGameTabs();
             break;
 
@@ -116,21 +116,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
             ' -> ' + JSON.stringify(change.newValue));
     }
 });
-
-// ──────────────────── Helper functions ────────────────────────
-
-async function reinitializeGameTabs() {
-    try {
-        const tabs = await chrome.tabs.query({ url: 'https://www.linkedin.com/games/*' });
-        log.info(SW, 'Found ' + tabs.length + ' game tab(s) to reload');
-        for (const tab of tabs) {
-            log.info(SW, '  Reloading tab ' + tab.id + ': ' + tab.url);
-            chrome.tabs.reload(tab.id);
-        }
-    } catch (e) {
-        log.error(SW, 'reinitializeGameTabs failed: ' + e.message);
-    }
-}
 
 // ──────────────────── Ready ───────────────────────────────────
 
